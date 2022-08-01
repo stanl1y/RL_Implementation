@@ -1,6 +1,6 @@
 import argparse
 import yaml
-from rl_algo import get_rl_agent
+from rl_algo import get_rl_agent, get_util
 from environment import get_env
 from replay_buffer import get_replay_buffer
 from main_stage import get_main_stage
@@ -71,5 +71,6 @@ if __name__ == "__main__":
     env = get_env(config.env, config.wrapper_type)
     agent = get_rl_agent(env, config)
     storage = get_replay_buffer(env, config)
+    util_dict=get_util(env, config)
     main_fn = get_main_stage(config)
-    main_fn.start(agent, env, storage)
+    main_fn.start(agent, env, storage, util_dict)
