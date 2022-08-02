@@ -73,8 +73,8 @@ class rainbow_dqn(base_dqn):
             target_q_val = reward + (1 - done) * self.gamma * target_q_val
 
         """compute loss and update"""
-        pred=self.q_network(state)
-        pred=pred.gather(1,action)
+        pred = self.q_network(state)
+        pred = pred.gather(1, action)
         loss = self.criterion(pred, target_q_val)
 
         self.optimizer.zero_grad()
@@ -82,12 +82,75 @@ class rainbow_dqn(base_dqn):
         self.optimizer.step()
         return loss
 
+    def DQfD_update(self, expert_state, expert_action):
+        q_val = self.q_network(expert_state)
+        max_action = self.q_network(expert_state).argmax(1).unsqueeze(1)
+        max_action_q_val = q_val.gather(1, max_action)
+        expert_action_q_val = q_val.gather(1, expert_action)
+        loss=(max_action_q_val+(max_action!=expert_action)*self.margin_value)-expert_action_q_val
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        return loss
+
+
+    def update_using_neighborhood_reward(self, storage, NeighborhoodNet):
+        """sample agent data"""
+        state, action, _, next_state, done = storage.sample(self.batch_size)
+
+        """sample expert data"""
+        expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
+            -1, expert=True
+        )
+
+        """construct a tensor that looks like
+        |s'^a_1, s^e_1|
+        |s'^a_1, s^e_2|
+        |s'^a_1, s^e_3|
+        | ......
+        |s'^a_m, s^e_{n-1}|
+        |s'^a_m, s^e_n|
+
+        it is in the shape (len(state)*len(expert_state), 2*observation_dim)
+        """
+        cartesian_product_state = np.concatenate(
+            (
+                np.repeat(next_state, len(expert_state), axis=0),
+                np.tile(expert_state, (len(next_state), 1)),
+            ),
+            axis=1,
+        )
+        cartesian_product_state = torch.FloatTensor(cartesian_product_state).to(device)
+
+        state = torch.FloatTensor(state).to(device)
+        action = torch.tensor(action, dtype=torch.int64).to(device)
+        next_state = torch.FloatTensor(next_state).to(device)
+        done = torch.FloatTensor(np.zeros_like(done)).to(
+            device
+        )  # try to use no done in imitation learning
+
+        expert_state = torch.FloatTensor(expert_state).to(device)
+        expert_action = torch.tensor(expert_action, dtype=torch.int64).to(device)
+        expert_next_state = torch.FloatTensor(expert_next_state).to(device)
+        expert_done = torch.FloatTensor(np.zeros_like(expert_done)).to(
+            device
+        )  # try to use no done in imitation learning
+
+        with torch.no_grad():
+            prob = NeighborhoodNet(cartesian_product_state)
+            # prob is in the shape of (len(next_state)*len(expert_state), 1)
+        reward = prob.reshape((len(next_state), len(expert_state))).mean(axis=1)
+        reward = torch.FloatTensor(reward).to(device)
+        loss = self.update_dqn(state, action, reward, next_state, done)
+
     def update(self, storage):
 
         """sample data"""
         state, action, reward, next_state, done = storage.sample(self.batch_size)
         state = torch.FloatTensor(state).to(device)
-        action = torch.tensor(action,dtype=torch.int64).to(device)#keep action int type
+        action = torch.tensor(action, dtype=torch.int64).to(
+            device
+        )  # keep action int type
         reward = torch.FloatTensor(reward).to(device)
         next_state = torch.FloatTensor(next_state).to(device)
         done = torch.FloatTensor(done).to(device)
@@ -152,6 +215,4 @@ class rainbow_dqn(base_dqn):
         self.best_q_network.load_state_dict(checkpoint["dqn_state_dict"])
         self.best_q_network = self.best_q_network.to(device)
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        self.best_optimizer.load_state_dict(
-            checkpoint["optimizer_state_dict"]
-        )
+        self.best_optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
