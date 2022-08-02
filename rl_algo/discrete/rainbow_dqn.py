@@ -87,12 +87,13 @@ class rainbow_dqn(base_dqn):
         max_action = self.q_network(expert_state).argmax(1).unsqueeze(1)
         max_action_q_val = q_val.gather(1, max_action)
         expert_action_q_val = q_val.gather(1, expert_action)
-        loss=(max_action_q_val+(max_action!=expert_action)*self.margin_value)-expert_action_q_val
+        loss = (
+            max_action_q_val + (max_action != expert_action) * self.margin_value
+        ) - expert_action_q_val
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         return loss
-
 
     def update_using_neighborhood_reward(self, storage, NeighborhoodNet):
         """sample agent data"""
@@ -141,7 +142,10 @@ class rainbow_dqn(base_dqn):
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
         reward = prob.reshape((len(next_state), len(expert_state))).mean(axis=1)
         reward = torch.FloatTensor(reward).to(device)
-        loss = self.update_dqn(state, action, reward, next_state, done)
+        td_loss = self.update_dqn(state, action, reward, next_state, done)
+        dqfd_loss = self.DQfD_update(expert_state, expert_action)
+        self.update_target()
+        return {"td_loss": td_loss, "dqfd_loss": dqfd_loss}
 
     def update(self, storage):
 

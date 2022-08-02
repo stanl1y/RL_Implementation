@@ -55,14 +55,26 @@ class vanilla_off_policy_training_stage:
         for episode in range(self.episodes):
             state = env.reset()
             done = False
+            total_reward = 0
             while not done:
                 action = agent.act(state)
                 next_state, reward, done, info = env.step(action)
+                total_reward += reward
                 storage.store(state, action, reward, next_state, done)
                 state = next_state
                 loss = self.update_neighbor_model(storage)
-                wandb.log({"loss": loss}, commit=False)
-                
+                wandb.log({"neighbor_model_loss": loss}, commit=False)
+                loss_info=agent.update_using_neighborhood_reward(storage,self.NeighborhoodNet)
+                wandb.log(loss_info, commit=False)
+            wandb.log(
+                {
+                    "training_reward": total_reward,
+                    "episode_num": episode,
+                    "buffer_size": len(storage),
+                }
+            )
+
+
 
 
             if episode % self.save_weight_period == 0:
