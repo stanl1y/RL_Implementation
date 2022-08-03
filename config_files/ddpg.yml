@@ -1,6 +1,8 @@
 env:
   # BipedalWalker-v3
   MountainCarContinuous-v0
+algo:
+  ddpg
 wrapper_type:
   basic
 hidden_dim:

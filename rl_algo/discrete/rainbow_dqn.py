@@ -82,14 +82,15 @@ class rainbow_dqn(base_dqn):
         self.optimizer.step()
         return loss
 
-    def DQfD_update(self, expert_state, expert_action):
+    def DQfD_update(self, expert_state, expert_action, margin_value=0.1):
         q_val = self.q_network(expert_state)
         max_action = self.q_network(expert_state).argmax(1).unsqueeze(1)
         max_action_q_val = q_val.gather(1, max_action)
         expert_action_q_val = q_val.gather(1, expert_action)
         loss = (
-            max_action_q_val + (max_action != expert_action) * self.margin_value
+            max_action_q_val + (max_action != expert_action) * margin_value
         ) - expert_action_q_val
+        loss = loss.mean()
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -140,10 +141,10 @@ class rainbow_dqn(base_dqn):
         with torch.no_grad():
             prob = NeighborhoodNet(cartesian_product_state)
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
-        reward = prob.reshape((len(next_state), len(expert_state))).mean(axis=1)
-        reward = torch.FloatTensor(reward).to(device)
+        reward = prob.reshape((len(next_state), len(expert_state))).mean(axis=1,keepdims=True)
+        # print(reward.shape)
         td_loss = self.update_dqn(state, action, reward, next_state, done)
-        dqfd_loss = self.DQfD_update(expert_state, expert_action)
+        dqfd_loss = self.DQfD_update(expert_state, expert_action, margin_value=0.1)
         self.update_target()
         return {"td_loss": td_loss, "dqfd_loss": dqfd_loss}
 
@@ -220,3 +221,4 @@ class rainbow_dqn(base_dqn):
         self.best_q_network = self.best_q_network.to(device)
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         self.best_optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        print("loaded weight from", path)

@@ -9,13 +9,13 @@ from main_stage import get_main_stage
 def get_config():
     parser = argparse.ArgumentParser(description="RL")
     parser.add_argument(
-        "--algo",
+        "--main_task",
         type=str,
         default="sac",
         help="which RL algo",
     )
     given_configs, remaining = parser.parse_known_args()
-    with open(f"config_files/{given_configs.algo}.yml", "r") as f:
+    with open(f"config_files/{given_configs.main_task}.yml", "r") as f:
         hyper = yaml.safe_load(f)
         parser.set_defaults(**hyper)
 
@@ -71,6 +71,10 @@ if __name__ == "__main__":
     env = get_env(config.env, config.wrapper_type)
     agent = get_rl_agent(env, config)
     storage = get_replay_buffer(env, config)
-    util_dict=get_util(env, config)
     main_fn = get_main_stage(config)
-    main_fn.start(agent, env, storage, util_dict)
+    if hasattr(config,"util"):
+        util_dict=get_util(env, config)
+        main_fn.start(agent, env, storage, util_dict)
+    else:
+        main_fn.start(agent, env, storage)
+

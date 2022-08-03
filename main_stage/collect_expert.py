@@ -18,13 +18,14 @@ class collect_expert:
 
     def start(self, agent, env, storage):
         agent.load_weight(self.algo,self.env_id)
+        agent.eval()
         if self.based_on_transition_num:
             done = False
             state = env.reset()
             total_reward=0
             episode_reward=0
             episode_num=0
-            while len(storage) < self.expert_data_num:
+            while len(storage) < self.expert_transition_num:
                 if done:
                     state = env.reset()
                     done = False
@@ -36,10 +37,10 @@ class collect_expert:
                 episode_reward+=reward
                 storage.store(state, action, reward, next_state, done)
                 state = next_state
-                print(f"expert data recording finish, average reward : {round(total_reward/max(episode_num,1),4)}")
+            print(f"expert data recording finish, average reward : {round(total_reward/max(episode_num,1),4)}")
             storage.write_storage(
                 self.based_on_transition_num,
-                self.expert_data_num,
+                self.expert_transition_num,
                 self.algo,
                 self.env_id,
             )

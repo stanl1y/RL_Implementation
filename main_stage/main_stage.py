@@ -1,6 +1,6 @@
 from .off_policy import *
 from .collect_expert import collect_expert
-
+from .neighborhood_il import neighborhood_il
 
 def get_main_stage(config):
     if config.main_stage_type == "off_policy":
@@ -9,6 +9,8 @@ def get_main_stage(config):
         return her_off_policy_training_stage(config)
     elif config.main_stage_type == "collect_expert":
         return collect_expert(config)
+    elif config.main_stage_type == "neighborhood_il":
+        return neighborhood_il(config)
     else:
         raise TypeError(
             f"training stage type : {config.training_stage_type} not supported"

@@ -13,7 +13,7 @@ else:
     device = torch.device("cpu")
 
 
-class vanilla_off_policy_training_stage:
+class neighborhood_il:
     def __init__(self, config):
         """get neighbor model config"""
         self.episodes = config.episodes
@@ -33,10 +33,11 @@ class vanilla_off_policy_training_stage:
         )
 
     def start(self, agent, env, storage, util_dict):
-        self.NeighborhoodNet = util_dict["NeighborhoodNet"]
+        self.NeighborhoodNet = util_dict["NeighborhoodNet"].to(device)
         self.NeighborhoodNet_optimizer = torch.optim.Adam(
             self.NeighborhoodNet.parameters(), lr=3e-4
         )
+        storage.load_expert_data(algo="rainbow_dqn", env_id=self.env_id)
         self.train(agent, env, storage)
 
     def train(self, agent, env, storage):
@@ -64,7 +65,9 @@ class vanilla_off_policy_training_stage:
                 state = next_state
                 loss = self.update_neighbor_model(storage)
                 wandb.log({"neighbor_model_loss": loss}, commit=False)
-                loss_info=agent.update_using_neighborhood_reward(storage,self.NeighborhoodNet)
+                loss_info = agent.update_using_neighborhood_reward(
+                    storage, self.NeighborhoodNet
+                )
                 wandb.log(loss_info, commit=False)
             wandb.log(
                 {
@@ -73,9 +76,6 @@ class vanilla_off_policy_training_stage:
                     "buffer_size": len(storage),
                 }
             )
-
-
-
 
             if episode % self.save_weight_period == 0:
                 path = f"./trained_model/neighborhood/{self.env_id}/"
@@ -87,9 +87,7 @@ class vanilla_off_policy_training_stage:
                     "neighborhood_optimizer_state_dict": self.NeighborhoodNet_optimizer.state_dict(),
                 }
 
-                file_path = os.path.join(
-                    path, f"episode{episode}.pt"
-                )
+                file_path = os.path.join(path, f"episode{episode}.pt")
                 torch.save(data, file_path)
                 try:
                     os.remove(self.previous_checkpoint_path)
@@ -97,30 +95,34 @@ class vanilla_off_policy_training_stage:
                     pass
                 self.previous_checkpoint_path = file_path
 
-
     def update_neighbor_model(self, storage):
         state, action, reward, next_state, done = storage.sample(self.batch_size)
         state = torch.FloatTensor(state).to(device)
         next_state = torch.FloatTensor(next_state).to(device)
         next_state_shift = torch.roll(next_state, 1, 0)  # for negative samples
         label = (
-            torch.LongTensor(
-                [np.concatenate((np.ones(state.shape[0]), np.zeros(state.shape[0])))]
+            torch.FloatTensor(
+                np.concatenate((np.ones(state.shape[0]), np.zeros(state.shape[0])))
             )
             .view((-1, 1))
             .to(device)
         )
-        loss_weight = torch.cat(
-            (
-                torch.ones(state.shape[0]) * self.neighbor_model_alpha,
-                torch.ones(state.shape[0]) * (1 - self.neighbor_model_alpha),
+
+        loss_weight = (
+            torch.cat(
+                (
+                    torch.ones(state.shape[0]) * self.neighbor_model_alpha,
+                    torch.ones(state.shape[0]) * (1 - self.neighbor_model_alpha),
+                )
             )
-        ).view((-1, 1))
+            .view((-1, 1))
+            .to(device)
+        )
         # predict positive samples
         posivite = self.NeighborhoodNet(torch.cat((state, next_state), axis=1))
         negative = self.NeighborhoodNet(torch.cat((state, next_state_shift), axis=1))
-        loss = self.neighbor_criteria(torch.cat((posivite, negative), axis=1), label)
-        loss = torch.mean(loss*loss_weight)
+        loss = self.neighbor_criteria(torch.cat((posivite, negative), axis=0), label)
+        loss = torch.mean(loss * loss_weight)
         self.NeighborhoodNet_optimizer.zero_grad()
         loss.backward()
         self.NeighborhoodNet_optimizer.step()

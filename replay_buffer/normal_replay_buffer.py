@@ -24,8 +24,8 @@ class normal_replay_buffer:
 
     def sample(self, batch_size, expert=False):
         if expert:
-            if(batch_size==-1):
-                indices=np.random.permutation(len(self.expert_states))
+            if batch_size == -1:
+                indices = np.random.permutation(len(self.expert_states))
             else:
                 indices = np.random.choice(len(self.expert_states), batch_size)
             return (
@@ -36,7 +36,9 @@ class normal_replay_buffer:
                 self.expert_dones[indices],
             )
         else:
-            index = np.random.randint(min(self.storage_index, self.size), size=batch_size)
+            index = np.random.randint(
+                min(self.storage_index, self.size), size=batch_size
+            )
             return (
                 self.states[index],
                 self.actions[index],
@@ -66,8 +68,15 @@ class normal_replay_buffer:
         with open(os.path.join(path, file_name), "wb") as handle:
             pickle.dump(data, handle)
 
-    def load_storage(self, algo, env_id):
+    def load_expert_data(self, algo, env_id):
         path = f"./saved_expert_transition/{env_id}/{algo}/"
+        assert os.path.isdir(path)
+        onlyfiles = [
+            os.path.join(path, f)
+            for f in os.listdir(path)
+            if os.path.isfile(os.path.join(path, f))
+        ]
+        path = onlyfiles[0]
         with open(path, "rb") as handle:
             data = pickle.load(handle)
         self.expert_states = data["states"]

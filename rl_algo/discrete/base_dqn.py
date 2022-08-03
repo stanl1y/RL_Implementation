@@ -131,6 +131,7 @@ class base_dqn:
         self.best_q_network.load_state_dict(checkpoint["dqn_state_dict"])
         self.optimizer.load_state_dict(checkpoint["dqn_optimizer_state_dict"])
         self.best_optimizer.load_state_dict(checkpoint["dqn_optimizer_state_dict"])
+        print("loaded weight from", path)
 
     def act(self):
         raise NotImplementedError
