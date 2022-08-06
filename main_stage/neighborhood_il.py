@@ -26,6 +26,7 @@ class neighborhood_il:
         self.batch_size = config.batch_size
         self.neighbor_model_alpha = config.neighbor_model_alpha
         self.neighbor_criteria = nn.BCELoss(reduction="none")
+        self.margin_value = config.margin_value
         wandb.init(
             project="Neighborhood",
             name=f"{self.env_id}",
@@ -40,6 +41,21 @@ class neighborhood_il:
         storage.load_expert_data(algo="rainbow_dqn", env_id=self.env_id)
         self.train(agent, env, storage)
 
+    def test(self, agent, env):
+        agent.eval()
+        total_reward = 0
+        for i in range(3):
+            state = env.reset()
+            done = False
+            while not done:
+                action = agent.act(state, testing=True)
+                next_state, reward, done, info = env.step(action)
+                total_reward += reward
+                state = next_state
+        total_reward /= 3
+        agent.train()
+        return total_reward
+
     def train(self, agent, env, storage):
         if self.buffer_warmup:
             state = env.reset()
@@ -53,6 +69,8 @@ class neighborhood_il:
                     done = False
                 else:
                     state = next_state
+        best_testing_reward = -1e7
+        best_episode = 0
         for episode in range(self.episodes):
             state = env.reset()
             done = False
@@ -66,7 +84,7 @@ class neighborhood_il:
                 loss = self.update_neighbor_model(storage)
                 wandb.log({"neighbor_model_loss": loss}, commit=False)
                 loss_info = agent.update_using_neighborhood_reward(
-                    storage, self.NeighborhoodNet
+                    storage, self.NeighborhoodNet, self.margin_value
                 )
                 wandb.log(loss_info, commit=False)
             wandb.log(
@@ -77,7 +95,17 @@ class neighborhood_il:
                 }
             )
 
+            if episode % 5 == 0:
+                testing_reward = self.test(agent, env)
+                if testing_reward > best_testing_reward:
+                    agent.cache_weight()
+                    best_testing_reward = testing_reward
+                    best_episode = episode
+                wandb.log({"testing_reward": testing_reward, "testing_episode_num": episode})
             if episode % self.save_weight_period == 0:
+                agent.save_weight(
+                    best_testing_reward, "neighborhood_il", self.env_id, best_episode
+                )
                 path = f"./trained_model/neighborhood/{self.env_id}/"
                 if not os.path.isdir(path):
                     os.makedirs(path)

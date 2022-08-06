@@ -70,6 +70,8 @@ class normal_replay_buffer:
 
     def load_expert_data(self, algo, env_id):
         path = f"./saved_expert_transition/{env_id}/{algo}/"
+        if not os.path.isdir(path):
+            path = f"./saved_expert_transition/{env_id}/oracle/"
         assert os.path.isdir(path)
         onlyfiles = [
             os.path.join(path, f)

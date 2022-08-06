@@ -96,7 +96,9 @@ class rainbow_dqn(base_dqn):
         self.optimizer.step()
         return loss
 
-    def update_using_neighborhood_reward(self, storage, NeighborhoodNet):
+    def update_using_neighborhood_reward(
+        self, storage, NeighborhoodNet, margin_value=0.1
+    ):
         """sample agent data"""
         state, action, _, next_state, done = storage.sample(self.batch_size)
 
@@ -141,10 +143,14 @@ class rainbow_dqn(base_dqn):
         with torch.no_grad():
             prob = NeighborhoodNet(cartesian_product_state)
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
-        reward = prob.reshape((len(next_state), len(expert_state))).mean(axis=1,keepdims=True)
+        reward = prob.reshape((len(next_state), len(expert_state))).mean(
+            axis=1, keepdims=True
+        )
         # print(reward.shape)
         td_loss = self.update_dqn(state, action, reward, next_state, done)
-        dqfd_loss = self.DQfD_update(expert_state, expert_action, margin_value=0.1)
+        dqfd_loss = self.DQfD_update(
+            expert_state, expert_action, margin_value=margin_value
+        )
         self.update_target()
         return {"td_loss": td_loss, "dqfd_loss": dqfd_loss}
 

@@ -18,7 +18,7 @@ optim:
 network_type: #or dueling
   dueling
 noisy_network:
-  False
+  True
 double_dqn:
   True
 buffer_type:
@@ -40,6 +40,8 @@ lr:
   0.0003
 tau:
   0.005
+margin_value:
+  1
 neighbor_model_alpha:
   0.75
 episodes:

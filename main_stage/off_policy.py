@@ -18,6 +18,7 @@ class vanilla_off_policy_training_stage:
         )
 
     def test(self, agent, env):
+        agent.eval()
         total_reward = 0
         for i in range(3):
             state = env.reset()
@@ -28,6 +29,7 @@ class vanilla_off_policy_training_stage:
                 total_reward += reward
                 state = next_state
         total_reward /= 3
+        agent.train()
         return total_reward
 
     def start(self, agent, env, storage):
