@@ -1,7 +1,6 @@
 import gym
 from .wrapper import *
 from .custom_env import *
-from gym import ObservationWrapper
 
           
 
@@ -33,10 +32,3 @@ def get_env(env_name,wrapper_type):
     else:
         raise TypeError(f"env wrapper type : {wrapper_type} not supported")
 
-class NormObs(ObservationWrapper):
-
-    def __init__(self, env):
-        super(NormObs, self).__init__(env)
-        
-    def observation(self, obs):
-        return (obs-(self.maze_size/2))/self.maze_size

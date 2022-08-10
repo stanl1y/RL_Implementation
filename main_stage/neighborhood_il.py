@@ -101,7 +101,14 @@ class neighborhood_il:
                     agent.cache_weight()
                     best_testing_reward = testing_reward
                     best_episode = episode
-                wandb.log({"testing_reward": testing_reward, "testing_episode_num": episode})
+                wandb.log(
+                    {"testing_reward": testing_reward, "testing_episode_num": episode}
+                )
+                img, arr_img, path_img, testing_reward = env.eval_toy_q_v2(
+                    agent,
+                    f"./experiment_logs/{self.env_id}_margin{self.margin_value}/",
+                    episode,
+                )
             if episode % self.save_weight_period == 0:
                 agent.save_weight(
                     best_testing_reward, "neighborhood_il", self.env_id, best_episode

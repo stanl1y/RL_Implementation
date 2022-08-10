@@ -1,12 +1,12 @@
 env:
   # BipedalWalker-v3
-  LunarLander-v2
+  Maze-v2
 algo:
   rainbow_dqn
 util:
   ["NeighborhoodNet"]
 wrapper_type:
-  basic
+  normobs
 hidden_dim:
   256
 gamma:
