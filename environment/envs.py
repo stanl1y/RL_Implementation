@@ -18,9 +18,14 @@ def get_env(env_name,wrapper_type):
         gym.envs.register(id="Maze-v0", entry_point=Maze_v0, max_episode_steps=250)          
         gym.envs.register(id="Maze-v1", entry_point=Maze_v1, max_episode_steps=400)          
         gym.envs.register(id="Maze-v2", entry_point=Maze_v2, max_episode_steps=400)
-        env=gym.make(env_name,**dict(random_reset=True,combine_s_g=True))
+        if(env_name=="Maze-v2"):
+            env=gym.make(env_name,**dict(random_reset=True,combine_s_g=True))
+        else:
+            env=gym.make(env_name,**dict(random_reset=True))
+
     else:
         env=gym.make(env_name)
+
     if wrapper_type=="basic":
         return BasicWrapper(env)
     elif wrapper_type=="gym_robotic":
@@ -28,6 +33,7 @@ def get_env(env_name,wrapper_type):
     elif wrapper_type=="her":
         return HERWrapper(env)
     elif wrapper_type=="normobs":
+        
         return NormObs(env)
     else:
         raise TypeError(f"env wrapper type : {wrapper_type} not supported")

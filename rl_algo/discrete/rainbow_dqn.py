@@ -125,7 +125,7 @@ class rainbow_dqn(base_dqn):
         with torch.no_grad():
             prob = NeighborhoodNet(cartesian_product_state)
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
-        reward = prob.reshape((len(next_state), len(expert_state))).mean(
+        reward = prob.reshape((len(next_state), len(expert_state))).sum(
             axis=1, keepdims=True
         )
         return reward

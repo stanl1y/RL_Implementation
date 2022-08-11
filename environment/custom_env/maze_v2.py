@@ -208,7 +208,7 @@ class Maze_v2(gym.Env):
         img = img * mask
         return img
 
-    def eval_toy_q_v2(self, agent, NeighborhoodNet, storage, path, episode):
+    def eval_toy_q(self, agent, NeighborhoodNet, storage, path, episode):
         """
         0:up, 1:right, 2:down, 3:left
         """

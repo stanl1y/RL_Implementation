@@ -104,7 +104,7 @@ class neighborhood_il:
                 wandb.log(
                     {"testing_reward": testing_reward, "testing_episode_num": episode}
                 )
-                img, arr_img, path_img, testing_reward = env.eval_toy_q_v2(
+                env.eval_toy_q(
                     agent,
                     self.NeighborhoodNet,
                     storage,

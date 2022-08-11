@@ -2,6 +2,7 @@ import gym
 from gym.spaces import Box
 import numpy as np
 from gym.wrappers import FilterObservation, FlattenObservation
+from gym import ObservationWrapper
 
 
 class BasicWrapper(gym.Wrapper):
@@ -41,7 +42,7 @@ class HERWrapper(BasicWrapper):
             + observation_space["observation"].shape[0]
         )
 
-class NormObs(BasicWrapper):
+class NormObs(ObservationWrapper, BasicWrapper):
 
     def __init__(self, env):
         super(NormObs, self).__init__(env)
