@@ -96,12 +96,7 @@ class rainbow_dqn(base_dqn):
         self.optimizer.step()
         return loss
 
-    def update_using_neighborhood_reward(
-        self, storage, NeighborhoodNet, margin_value=0.1
-    ):
-        """sample agent data"""
-        state, action, _, next_state, done = storage.sample(self.batch_size)
-
+    def neighborhood_reward(self, NeighborhoodNet, storage, next_state):
         """sample expert data"""
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             -1, expert=True
@@ -117,6 +112,7 @@ class rainbow_dqn(base_dqn):
 
         it is in the shape (len(state)*len(expert_state), 2*observation_dim)
         """
+
         cartesian_product_state = np.concatenate(
             (
                 np.repeat(next_state, len(expert_state), axis=0),
@@ -126,6 +122,22 @@ class rainbow_dqn(base_dqn):
         )
         cartesian_product_state = torch.FloatTensor(cartesian_product_state).to(device)
 
+        with torch.no_grad():
+            prob = NeighborhoodNet(cartesian_product_state)
+            # prob is in the shape of (len(next_state)*len(expert_state), 1)
+        reward = prob.reshape((len(next_state), len(expert_state))).mean(
+            axis=1, keepdims=True
+        )
+        return reward
+
+    def update_using_neighborhood_reward(
+        self, storage, NeighborhoodNet, margin_value=0.1
+    ):
+        """sample agent data"""
+        state, action, _, next_state, done = storage.sample(self.batch_size)
+
+        reward = self.neighborhood_reward(NeighborhoodNet, storage, next_state)
+
         state = torch.FloatTensor(state).to(device)
         action = torch.tensor(action, dtype=torch.int64).to(device)
         next_state = torch.FloatTensor(next_state).to(device)
@@ -133,21 +145,14 @@ class rainbow_dqn(base_dqn):
             device
         )  # try to use no done in imitation learning
 
+
+        td_loss = self.update_dqn(state, action, reward, next_state, done)
+
+        expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
+            self.batch_size, expert=True
+        )
         expert_state = torch.FloatTensor(expert_state).to(device)
         expert_action = torch.tensor(expert_action, dtype=torch.int64).to(device)
-        expert_next_state = torch.FloatTensor(expert_next_state).to(device)
-        expert_done = torch.FloatTensor(np.zeros_like(expert_done)).to(
-            device
-        )  # try to use no done in imitation learning
-
-        with torch.no_grad():
-            prob = NeighborhoodNet(cartesian_product_state)
-            # prob is in the shape of (len(next_state)*len(expert_state), 1)
-        reward = prob.reshape((len(next_state), len(expert_state))).mean(
-            axis=1, keepdims=True
-        )
-        # print(reward.shape)
-        td_loss = self.update_dqn(state, action, reward, next_state, done)
         dqfd_loss = self.DQfD_update(
             expert_state, expert_action, margin_value=margin_value
         )

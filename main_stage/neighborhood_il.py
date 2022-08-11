@@ -106,6 +106,8 @@ class neighborhood_il:
                 )
                 img, arr_img, path_img, testing_reward = env.eval_toy_q_v2(
                     agent,
+                    self.NeighborhoodNet,
+                    storage,
                     f"./experiment_logs/{self.env_id}_margin{self.margin_value}/",
                     episode,
                 )

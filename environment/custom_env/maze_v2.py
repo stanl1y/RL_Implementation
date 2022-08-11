@@ -208,7 +208,7 @@ class Maze_v2(gym.Env):
         img = img * mask
         return img
 
-    def eval_toy_q_v2(self, agent, path, episode):
+    def eval_toy_q_v2(self, agent, NeighborhoodNet, storage, path, episode):
         """
         0:up, 1:right, 2:down, 3:left
         """
@@ -218,6 +218,8 @@ class Maze_v2(gym.Env):
             os.makedirs(path + "arr/")
         if not os.path.exists(path + "path/"):
             os.makedirs(path + "path/")
+        if not os.path.exists(path + "neighbor_reward/"):
+            os.makedirs(path + "neighbor_reward/")
         if not os.path.exists(path + "raw_flow/"):
             os.makedirs(path + "raw_flow/")
         if not os.path.exists(path + "raw_path/"):
@@ -277,16 +279,18 @@ class Maze_v2(gym.Env):
             draw q-function for different target
             """
             if self.combine_s_g:
-                query = np.concatenate(
+                query_np = np.concatenate(
                     (yy[:, :, None] - target[0], xx[:, :, None] - target[1]), axis=2
                 ).reshape(self.maze_size * self.maze_size, 2)
             else:
-                query = np.concatenate(
+                query_np = np.concatenate(
                     (yy[:, :, None], xx[:, :, None]), axis=2
                 ).reshape(self.maze_size * self.maze_size, 2, 2)
-                query = np.c_[query, np.repeat([target], query.shape[0], axis=0)]
-            query_norm = (query - self.maze_size / 2) / self.maze_size
-            query_norm = torch.FloatTensor(query_norm).cuda()
+                query_np = np.c_[
+                    query_np, np.repeat([target], query_np.shape[0], axis=0)
+                ]
+            query_norm_np = (query_np - self.maze_size / 2) / self.maze_size
+            query_norm = torch.FloatTensor(query_norm_np).cuda()
             with torch.no_grad():
                 q = agent.q_network(query_norm)
                 u = (
@@ -369,6 +373,18 @@ class Maze_v2(gym.Env):
             )
             plt.savefig(f"{path}arr/{episode}-{target_idx}.png", pad_inches=0)
             plt.close()
-        # plt.imsave(f"{path}arr{episode}.png",arr_img)
+            # plt.imsave(f"{path}arr{episode}.png",arr_img)
+            with torch.no_grad():
+                neighborhood_reward = agent.neighborhood_reward(
+                    NeighborhoodNet, storage, query_norm_np
+                )
+            neighborhood_reward = neighborhood_reward.cpu().numpy()
+            neighborhood_reward = neighborhood_reward.reshape(
+                self.maze_size, self.maze_size, 1
+            )
+            neighborhood_reward = self.draw_border_v2(neighborhood_reward, target_idx)
+            neighborhood_reward = neighborhood_reward / neighborhood_reward.max()
+            neighborhood_reward = np.repeat(neighborhood_reward, 3, axis=2)
+            plt.imsave(f"{path}neighbor_reward/{episode}-{target_idx}.png", neighborhood_reward)
 
         return img, arr_img, maze, rewards
