@@ -40,18 +40,18 @@ class rainbow_dqn(base_dqn):
             optim=optim,
             lr=lr,
             tau=tau,
+            epsilon=epsilon,
+            epsilon_decay=epsilon_decay,
+            epsilon_min=epsilon_min,
             batch_size=batch_size,
         )
         self.double_dqn = double_dqn
-        self.epsilon = epsilon
-        self.epsilon_decay = epsilon_decay
-        self.epsilon_min = epsilon_min
 
     def act(self, state, testing=False):
         state = torch.FloatTensor(state).unsqueeze(0).to(device)
         if np.random.rand() < self.epsilon and not testing and not self.noisy_network:
             action = np.random.randint(0, self.action_num)
-        else:
+        else:#acting greedly
             action = self.q_network(state).cpu().detach().numpy()
             action = np.argmax(action[0])
         return action

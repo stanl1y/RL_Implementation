@@ -224,7 +224,7 @@ class Maze_v0(gym.Env):
         #     return self.state, 0.01, True, {}
 
         if self.is_terminal(self.state):
-            return self.state, 1.0, True, {"x": self.state[0], "y": self.state[1]}
+            return self.state, 1.0/self.agent_step, True, {"x": self.state[0], "y": self.state[1]}
 
         reward = 0.0
         if self.agent_step == self.maze_size * 5:

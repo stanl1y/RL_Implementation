@@ -42,18 +42,19 @@ class neighborhood_il:
         self.train(agent, env, storage)
 
     def test(self, agent, env):
-        agent.eval()
+        # agent.eval()
         total_reward = 0
         for i in range(3):
             state = env.reset()
             done = False
             while not done:
-                action = agent.act(state, testing=True)
+                action = agent.act(state, testing=False)
+                # agent.q_network.reset_noise()
                 next_state, reward, done, info = env.step(action)
                 total_reward += reward
                 state = next_state
         total_reward /= 3
-        agent.train()
+        # agent.train()
         return total_reward
 
     def train(self, agent, env, storage):
@@ -94,6 +95,7 @@ class neighborhood_il:
                     "buffer_size": len(storage),
                 }
             )
+            agent.update_epsilon()
 
             if episode % 5 == 0:
                 testing_reward = self.test(agent, env)
