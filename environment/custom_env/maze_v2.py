@@ -247,6 +247,7 @@ class Maze_v2(gym.Env):
         color = np.array([128, 128, 128])
         color_step = np.array([3, 2, -2])
         state = self.reset()
+        state = (state - (self.maze_size / 2)) / self.maze_size
         maze[self.maze_size - 1, 0] = color
         self.update_color(color, color_step)
         done = False
@@ -265,6 +266,7 @@ class Maze_v2(gym.Env):
             else:
                 maze[pos[0], pos[1]] = np.array([255, 0, 0])
             state = next_state
+            state = (state - (self.maze_size / 2)) / self.maze_size
             episode_steps += 1
         rewards  # /=episode_steps
         with open(f"{path}raw_path/{episode}.pkl", "wb") as fp:
@@ -292,7 +294,12 @@ class Maze_v2(gym.Env):
             query_norm_np = (query_np - self.maze_size / 2) / self.maze_size
             query_norm = torch.FloatTensor(query_norm_np).cuda()
             with torch.no_grad():
-                q = agent.q_network(query_norm)
+                if hasattr(agent, "q_network"):
+                    q = agent.q_network(query_norm)
+                else:
+                    q0 = agent.critic[0](query_norm)
+                    q1 = agent.critic[1](query_norm)
+                    q = torch.min(q0, q1)
                 u = (
                     (q[:, 1] - q[:, 3]).cpu().numpy()
                 )  # horizontal positive:right,  negative:left
@@ -385,6 +392,8 @@ class Maze_v2(gym.Env):
             neighborhood_reward = self.draw_border_v2(neighborhood_reward, target_idx)
             neighborhood_reward = neighborhood_reward / neighborhood_reward.max()
             neighborhood_reward = np.repeat(neighborhood_reward, 3, axis=2)
-            plt.imsave(f"{path}neighbor_reward/{episode}-{target_idx}.png", neighborhood_reward)
+            plt.imsave(
+                f"{path}neighbor_reward/{episode}-{target_idx}.png", neighborhood_reward
+            )
 
         return img, arr_img, maze, rewards

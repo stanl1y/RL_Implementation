@@ -1,0 +1,52 @@
+env:
+  Maze-v0
+algo:
+  discrete_sac
+util:
+  ["NeighborhoodNet"]
+wrapper_type:
+  normobs
+bc_only:
+  False
+ood:
+  True
+hidden_dim:
+  256
+gamma:
+  0.99
+optim:
+  adam
+buffer_type:
+  normal
+td_length:
+  1
+soft_update_target:
+  True
+lr:
+  0.0003
+tau:
+  0.005
+neighbor_model_alpha:
+  0.75
+episodes:
+  200
+seed:
+  1
+save_every:
+  10
+batch_size:
+  256
+buffer_size:
+  1000000
+main_stage_type:
+  neighborhood_il
+buffer_warmup:
+  True
+continue_training:
+  False
+buffer_warmup_step:
+  2000
+save_weight_period:
+  50
+render:
+  False

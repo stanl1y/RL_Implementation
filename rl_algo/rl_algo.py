@@ -72,5 +72,17 @@ def get_rl_agent(env, config):
             tau=config.tau,
             batch_size=config.batch_size,
         )
+    elif config.algo == "discrete_sac":
+        return discrete_sac(
+            observation_dim=env.get_observation_dim(),
+            action_num=env.get_action_dim(),
+            hidden_dim=config.hidden_dim,
+            gamma=config.gamma,
+            optim=config.optim,
+            soft_update_target=config.soft_update_target,
+            lr=config.lr,
+            tau=config.tau,
+            batch_size=config.batch_size,
+        )
     else:
         raise TypeError(f"rl agent type : {config.algo} not supported")

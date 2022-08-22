@@ -19,14 +19,19 @@ class neighborhood_il:
         self.episodes = config.episodes
         self.buffer_warmup = config.buffer_warmup
         self.buffer_warmup_step = config.buffer_warmup_step
-        # self.algo = config.algo
+        self.algo = config.algo
         self.env_id = config.env
         self.save_weight_period = config.save_weight_period
         self.continue_training = config.continue_training
         self.batch_size = config.batch_size
         self.neighbor_model_alpha = config.neighbor_model_alpha
         self.neighbor_criteria = nn.BCELoss(reduction="none")
-        self.margin_value = config.margin_value
+        self.ood = config.ood
+        self.bc_only = config.bc_only
+        try:
+            self.margin_value = config.margin_value
+        except:
+            self.margin_value = 0.1
         wandb.init(
             project="Neighborhood",
             name=f"{self.env_id}",
@@ -38,7 +43,7 @@ class neighborhood_il:
         self.NeighborhoodNet_optimizer = torch.optim.Adam(
             self.NeighborhoodNet.parameters(), lr=3e-4
         )
-        storage.load_expert_data(algo="rainbow_dqn", env_id=self.env_id)
+        storage.load_expert_data(algo=self.algo, env_id=self.env_id)
         self.train(agent, env, storage)
 
     def test(self, agent, env):
@@ -47,6 +52,9 @@ class neighborhood_il:
         for i in range(3):
             state = env.reset()
             done = False
+            if(self.ood):
+                for _ in range(5):
+                    state, reward, done, info = env.step(env.action_space.sample())
             while not done:
                 action = agent.act(state, testing=False)
                 # agent.q_network.reset_noise()
@@ -85,7 +93,7 @@ class neighborhood_il:
                 loss = self.update_neighbor_model(storage)
                 wandb.log({"neighbor_model_loss": loss}, commit=False)
                 loss_info = agent.update_using_neighborhood_reward(
-                    storage, self.NeighborhoodNet, self.margin_value
+                    storage, self.NeighborhoodNet, self.margin_value, self.bc_only
                 )
                 wandb.log(loss_info, commit=False)
             wandb.log(
@@ -95,7 +103,8 @@ class neighborhood_il:
                     "buffer_size": len(storage),
                 }
             )
-            agent.update_epsilon()
+            if hasattr(agent, "update_epsilon"):
+                agent.update_epsilon()
 
             if episode % 5 == 0:
                 testing_reward = self.test(agent, env)
@@ -106,13 +115,14 @@ class neighborhood_il:
                 wandb.log(
                     {"testing_reward": testing_reward, "testing_episode_num": episode}
                 )
-                env.eval_toy_q(
-                    agent,
-                    self.NeighborhoodNet,
-                    storage,
-                    f"./experiment_logs/{self.env_id}_margin{self.margin_value}/",
-                    episode,
-                )
+                if hasattr(env, "eval_toy_q"):
+                    env.eval_toy_q(
+                        agent,
+                        self.NeighborhoodNet,
+                        storage,
+                        f"./experiment_logs/{self.env_id}_margin{self.margin_value}/",
+                        episode,
+                    )
             if episode % self.save_weight_period == 0:
                 agent.save_weight(
                     best_testing_reward, "neighborhood_il", self.env_id, best_episode
