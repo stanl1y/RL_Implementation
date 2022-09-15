@@ -19,4 +19,4 @@ class NeighborhoodNet(nn.Module):
         x = F.relu(self.fc3(x))
         x = self.output_activation(self.fc4(x))
         return x
-        
+    

@@ -3,7 +3,9 @@ env:
 algo:
   discrete_sac
 util:
-  ["NeighborhoodNet"]
+  ["NeighborhoodNet", "OracleNeighborhoodNet"]
+oracle_neighbor:
+  False
 wrapper_type:
   normobs
 bc_only:
@@ -27,7 +29,7 @@ lr:
 tau:
   0.005
 neighbor_model_alpha:
-  0.75
+  0.99
 episodes:
   200
 seed:
@@ -50,3 +52,17 @@ save_weight_period:
   50
 render:
   False
+update_neighbor_frequency:
+  10
+update_neighbor_step:
+  400
+update_neighbor_until:
+  150
+discretize_reward:
+  True
+log_name:
+  ""
+duplicate_expert_last_state:
+  True
+data_name:
+  ""

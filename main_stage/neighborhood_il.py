@@ -28,22 +28,33 @@ class neighborhood_il:
         self.neighbor_criteria = nn.BCELoss(reduction="none")
         self.ood = config.ood
         self.bc_only = config.bc_only
+        self.update_neighbor_frequency = config.update_neighbor_frequency
+        self.update_neighbor_step = config.update_neighbor_step
+        self.update_neighbor_until = config.update_neighbor_until
+        self.oracle_neighbor = config.oracle_neighbor
+        self.discretize_reward = config.discretize_reward
+        self.log_name = config.log_name
+        self.duplicate_expert_last_state = config.duplicate_expert_last_state
+        self.data_name=config.data_name
         try:
             self.margin_value = config.margin_value
         except:
             self.margin_value = 0.1
         wandb.init(
             project="Neighborhood",
-            name=f"{self.env_id}",
+            name=f"{self.env_id}{self.log_name}",
             config=config,
         )
 
     def start(self, agent, env, storage, util_dict):
-        self.NeighborhoodNet = util_dict["NeighborhoodNet"].to(device)
-        self.NeighborhoodNet_optimizer = torch.optim.Adam(
-            self.NeighborhoodNet.parameters(), lr=3e-4
-        )
-        storage.load_expert_data(algo=self.algo, env_id=self.env_id)
+        if self.oracle_neighbor:
+            self.NeighborhoodNet = util_dict["OracleNeighborhoodNet"].to(device)
+        else:
+            self.NeighborhoodNet = util_dict["NeighborhoodNet"].to(device)
+            self.NeighborhoodNet_optimizer = torch.optim.Adam(
+                self.NeighborhoodNet.parameters(), lr=3e-4
+            )
+        storage.load_expert_data(algo=self.algo, env_id=self.env_id, duplicate_expert_last_state=self.duplicate_expert_last_state, data_name=self.data_name)
         self.train(agent, env, storage)
 
     def test(self, agent, env):
@@ -54,7 +65,7 @@ class neighborhood_il:
             done = False
             if(self.ood):
                 for _ in range(5):
-                    state, reward, done, info = env.step(env.action_space.sample())
+                    state, reward, done, info = env.step(1)#env.action_space.sample()
             while not done:
                 action = agent.act(state, testing=False)
                 # agent.q_network.reset_noise()
@@ -81,6 +92,10 @@ class neighborhood_il:
         best_testing_reward = -1e7
         best_episode = 0
         for episode in range(self.episodes):
+            if not self.oracle_neighbor and episode % self.update_neighbor_frequency == 0 and episode <=self.update_neighbor_until:
+                for _ in range(self.update_neighbor_step):
+                    loss = self.update_neighbor_model(storage)
+                    wandb.log({"neighbor_model_loss": loss}, commit=False)
             state = env.reset()
             done = False
             total_reward = 0
@@ -90,10 +105,10 @@ class neighborhood_il:
                 total_reward += reward
                 storage.store(state, action, reward, next_state, done)
                 state = next_state
-                loss = self.update_neighbor_model(storage)
-                wandb.log({"neighbor_model_loss": loss}, commit=False)
+                # loss = self.update_neighbor_model(storage)
+                # wandb.log({"neighbor_model_loss": loss}, commit=False)
                 loss_info = agent.update_using_neighborhood_reward(
-                    storage, self.NeighborhoodNet, self.margin_value, self.bc_only
+                    storage, self.NeighborhoodNet, self.margin_value, self.bc_only, self.oracle_neighbor, self.discretize_reward
                 )
                 wandb.log(loss_info, commit=False)
             wandb.log(
@@ -120,10 +135,11 @@ class neighborhood_il:
                         agent,
                         self.NeighborhoodNet,
                         storage,
-                        f"./experiment_logs/{self.env_id}_margin{self.margin_value}/",
+                        f"./experiment_logs/{self.env_id}{self.log_name}/",
                         episode,
+                        self.oracle_neighbor
                     )
-            if episode % self.save_weight_period == 0:
+            if episode % self.save_weight_period == 0 and not self.oracle_neighbor:
                 agent.save_weight(
                     best_testing_reward, "neighborhood_il", self.env_id, best_episode
                 )
@@ -156,7 +172,10 @@ class neighborhood_il:
             .view((-1, 1))
             .to(device)
         )
-
+        
+        posivite = self.NeighborhoodNet(torch.cat((state, next_state), axis=1))
+        negative = self.NeighborhoodNet(torch.cat((state, next_state_shift), axis=1))
+        
         loss_weight = (
             torch.cat(
                 (
@@ -168,11 +187,11 @@ class neighborhood_il:
             .to(device)
         )
         # predict positive samples
-        posivite = self.NeighborhoodNet(torch.cat((state, next_state), axis=1))
-        negative = self.NeighborhoodNet(torch.cat((state, next_state_shift), axis=1))
         loss = self.neighbor_criteria(torch.cat((posivite, negative), axis=0), label)
         loss = torch.mean(loss * loss_weight)
         self.NeighborhoodNet_optimizer.zero_grad()
         loss.backward()
         self.NeighborhoodNet_optimizer.step()
         return loss.item()
+
+#CUDA_VISIBLE_DEVICES=0 python3 main.py --main_stage neighborhood_il --main_task neighborhood_dsac --env LunarLander-v2 --wrapper basic --episode 2000 --log_name expectile99_ac_duplicateLast_nextStateReward_disReward

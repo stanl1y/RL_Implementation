@@ -79,7 +79,12 @@ class discrete_sac(base_ac):
     def alpha(self):
         return self.log_alpha.exp().detach()
 
-    def update_ac(self, state, action, reward, next_state, done, bc_only):
+    def update_ac(
+        self, state, action, reward, next_state, done, bc_only, train_expert_data=False
+    ):
+        actor_loss = 0
+        entropy = 0
+        alpha_loss = 0
         if not bc_only:
             """update actor"""
             actor_loss, entropy = self.calc_policy_loss(state)
@@ -87,19 +92,17 @@ class discrete_sac(base_ac):
             actor_loss.backward()
             self.actor_optimizer.step()
 
-            """update alpha"""
-            entropy=entropy.mean()
-            alpha_loss = (
-                self.log_alpha
-                * (self.target_entropy - entropy).exp().detach()  # .exp()
-            )
-            self.log_alpha_optimizer.zero_grad()
-            alpha_loss.backward()
-            self.log_alpha_optimizer.step()
-        else:
-            actor_loss = 0
-            entropy = 0
-            alpha_loss = 0
+            if not train_expert_data:
+                """update alpha"""
+                entropy = entropy.mean()
+                alpha_loss = (
+                    self.log_alpha
+                    * (self.target_entropy - entropy).exp().detach()  # .exp()
+                )
+                self.log_alpha_optimizer.zero_grad()
+                alpha_loss.backward()
+                self.log_alpha_optimizer.step()
+
         """compute target value"""
         with torch.no_grad():
             (
@@ -156,22 +159,29 @@ class discrete_sac(base_ac):
     #     return loss
 
     def bc_update(self, expert_state, expert_action):
-        if not hasattr(self, "bc_optimizer") or not hasattr(self, "bc_criterion"):
-            self.bc_optimizer = torch.optim.Adam(
-                self.actor.parameters(), lr=self.actor_lr
-            )
-            self.bc_criterion = nn.CrossEntropyLoss()
+        # if not hasattr(self, "bc_optimizer") or not hasattr(self, "bc_criterion"):
+        #     self.bc_optimizer = torch.optim.Adam(
+        #         self.actor.parameters(), lr=self.actor_lr
+        #     )
+        self.bc_criterion = nn.CrossEntropyLoss()
         _, logit, action_probs, action_log_prob = self.actor.evaluate(
             expert_state
         )  # prob and log prob of each action
         bc_loss = self.bc_criterion(logit, expert_action.view(-1))
 
-        self.bc_optimizer.zero_grad()
+        self.actor_optimizer.zero_grad()
         bc_loss.backward()
-        self.bc_optimizer.step()
+        self.actor_optimizer.step()
         return bc_loss
 
-    def neighborhood_reward(self, NeighborhoodNet, storage, next_state):
+    def neighborhood_reward(
+        self,
+        NeighborhoodNet,
+        storage,
+        next_state,
+        oracle_neighbor,
+        discretize_reward=False,
+    ):
         """sample expert data"""
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             -1, expert=True
@@ -190,8 +200,8 @@ class discrete_sac(base_ac):
 
         cartesian_product_state = np.concatenate(
             (
-                np.repeat(next_state, len(expert_state), axis=0),
-                np.tile(expert_state, (len(next_state), 1)),
+                np.repeat(next_state, len(expert_next_state), axis=0),
+                np.tile(expert_next_state, (len(next_state), 1)),
             ),
             axis=1,
         )
@@ -200,16 +210,29 @@ class discrete_sac(base_ac):
         with torch.no_grad():
             prob = NeighborhoodNet(cartesian_product_state)
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
-        reward = prob.reshape((len(next_state), len(expert_state))).sum(
+        if discretize_reward:
+            prob[prob > 0.5] = 0.5
+            prob[prob <= 0.5] = 0
+        reward = prob.reshape((len(next_state), len(expert_next_state))).sum(
             axis=1, keepdims=True
         )
         return reward
 
-    def update_using_neighborhood_reward(self, storage, NeighborhoodNet, margin_value, bc_only=False):
+    def update_using_neighborhood_reward(
+        self,
+        storage,
+        NeighborhoodNet,
+        margin_value,
+        bc_only=False,
+        oracle_neighbor=False,
+        discretize_reward=False,
+    ):
         """sample agent data"""
         state, action, _, next_state, done = storage.sample(self.batch_size)
 
-        reward = self.neighborhood_reward(NeighborhoodNet, storage, next_state)
+        reward = self.neighborhood_reward(
+            NeighborhoodNet, storage, next_state, oracle_neighbor, discretize_reward
+        )
 
         state = torch.FloatTensor(state).to(device)
         action = torch.tensor(action, dtype=torch.int64).to(device)
@@ -223,11 +246,38 @@ class discrete_sac(base_ac):
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             self.batch_size, expert=True
         )
+
+        expert_reward = self.neighborhood_reward(
+            NeighborhoodNet,
+            storage,
+            expert_next_state,
+            oracle_neighbor,
+            discretize_reward,
+        )
         expert_state = torch.FloatTensor(expert_state).to(device)
         expert_action = torch.tensor(expert_action, dtype=torch.int64).to(device)
+        expert_next_state = torch.FloatTensor(expert_next_state).to(device)
+        expert_done = torch.FloatTensor(np.zeros_like(expert_done)).to(device)
         bc_loss = self.bc_update(expert_state, expert_action)
+        expert_ac_loss = self.update_ac(
+            expert_state,
+            expert_action,
+            expert_reward,
+            expert_next_state,
+            expert_done,
+            bc_only,
+        )
+        expert_keys = {
+            "expert_critic0_loss": "critic0_loss",
+            "expert_critic1_loss": "critic1_loss",
+            "expert_actor_loss": "actor_loss",
+        }
+        tmp = dict(
+            (key, expert_ac_loss[expert_keys[key]]) for key in expert_keys.keys()
+        )
+
         self.update_target()
-        return {**ac_loss, "bc_loss": bc_loss}
+        return {**ac_loss, **tmp, "bc_loss": bc_loss}
 
     def update(self, storage):
 

@@ -208,7 +208,7 @@ class Maze_v2(gym.Env):
         img = img * mask
         return img
 
-    def eval_toy_q(self, agent, NeighborhoodNet, storage, path, episode):
+    def eval_toy_q(self, agent, NeighborhoodNet, storage, path, episode, oracle_neighbor):
         """
         0:up, 1:right, 2:down, 3:left
         """
@@ -383,7 +383,7 @@ class Maze_v2(gym.Env):
             # plt.imsave(f"{path}arr{episode}.png",arr_img)
             with torch.no_grad():
                 neighborhood_reward = agent.neighborhood_reward(
-                    NeighborhoodNet, storage, query_norm_np
+                    NeighborhoodNet, storage, query_norm_np, oracle_neighbor
                 )
             neighborhood_reward = neighborhood_reward.cpu().numpy()
             neighborhood_reward = neighborhood_reward.reshape(

@@ -15,7 +15,7 @@ class collect_toy_oracle:
             )
         self.env_id = config.env
 
-    def start(self, agent, env, storage, util_dict):
+    def start(self, agent, env, storage, util_dict=None):
         if self.based_on_transition_num:
             done = False
             state = env.reset()
