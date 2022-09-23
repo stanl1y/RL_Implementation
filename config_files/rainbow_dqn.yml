@@ -16,7 +16,7 @@ optim:
 network_type: #or dueling
   dueling
 noisy_network:
-  False
+  True
 double_dqn:
   True
 buffer_type:

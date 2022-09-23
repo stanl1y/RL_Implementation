@@ -80,19 +80,33 @@ class discrete_sac(base_ac):
         return self.log_alpha.exp().detach()
 
     def update_ac(
-        self, state, action, reward, next_state, done, bc_only, train_expert_data=False
+        self,
+        state,
+        action,
+        reward,
+        next_state,
+        done,
+        bc_only=False,
+        train_expert_data=False,
+        threshold=None,
     ):
         actor_loss = 0
         entropy = 0
         alpha_loss = 0
-        if not bc_only:
-            """update actor"""
-            actor_loss, entropy = self.calc_policy_loss(state)
-            self.actor_optimizer.zero_grad()
-            actor_loss.backward()
-            self.actor_optimizer.step()
+        filtered = 0
+        if not bc_only and not train_expert_data:
+            if threshold != None:
+                state_idx = torch.argwhere(reward.reshape(-1) < threshold)
+                policy_state = state[state_idx]
+            else:
+                policy_state = state
+            filtered = state.shape[0] - policy_state.shape[0]
+            if policy_state.shape[0] > 0:
+                actor_loss, entropy = self.calc_policy_loss(policy_state)
+                self.actor_optimizer.zero_grad()
+                actor_loss.backward()
+                self.actor_optimizer.step()
 
-            if not train_expert_data:
                 """update alpha"""
                 entropy = entropy.mean()
                 alpha_loss = (
@@ -142,6 +156,7 @@ class discrete_sac(base_ac):
             "alpha": self.alpha,
             "entropy": entropy,
             "log_alpha": self.log_alpha.detach().cpu().numpy(),
+            "filtered": filtered,
         }
 
     # def DQfD_update(self, expert_state, expert_action, margin_value=0.1):
@@ -226,6 +241,7 @@ class discrete_sac(base_ac):
         bc_only=False,
         oracle_neighbor=False,
         discretize_reward=False,
+        policy_threshold_ratio=0.5,
     ):
         """sample agent data"""
         state, action, _, next_state, done = storage.sample(self.batch_size)
@@ -240,8 +256,6 @@ class discrete_sac(base_ac):
         done = torch.FloatTensor(np.zeros_like(done)).to(
             device
         )  # try to use no done in imitation learning
-
-        ac_loss = self.update_ac(state, action, reward, next_state, done, bc_only)
 
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             self.batch_size, expert=True
@@ -258,7 +272,23 @@ class discrete_sac(base_ac):
         expert_action = torch.tensor(expert_action, dtype=torch.int64).to(device)
         expert_next_state = torch.FloatTensor(expert_next_state).to(device)
         expert_done = torch.FloatTensor(np.zeros_like(expert_done)).to(device)
+        expert_reward_mean = expert_reward.mean().item()
+        ac_loss = self.update_ac(
+            state,
+            action,
+            reward,
+            next_state,
+            done,
+            bc_only,
+            threshold=expert_reward_mean * policy_threshold_ratio,
+        )
+        reward_dict = {
+            "expert_reward_mean": expert_reward_mean,
+            "sampled_exp_reward_mean": reward.mean().item(),
+        }
         bc_loss = self.bc_update(expert_state, expert_action)
+
+        """we are not updating actor here"""
         expert_ac_loss = self.update_ac(
             expert_state,
             expert_action,
@@ -266,6 +296,7 @@ class discrete_sac(base_ac):
             expert_next_state,
             expert_done,
             bc_only,
+            train_expert_data=True,
         )
         expert_keys = {
             "expert_critic0_loss": "critic0_loss",
@@ -277,7 +308,7 @@ class discrete_sac(base_ac):
         )
 
         self.update_target()
-        return {**ac_loss, **tmp, "bc_loss": bc_loss}
+        return {**ac_loss, **tmp, **reward_dict, "bc_loss": bc_loss}
 
     def update(self, storage):
 

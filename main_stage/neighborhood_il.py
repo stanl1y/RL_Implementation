@@ -36,6 +36,8 @@ class neighborhood_il:
         self.log_name = config.log_name
         self.duplicate_expert_last_state = config.duplicate_expert_last_state
         self.data_name=config.data_name
+        self.policy_threshold_ratio=config.policy_threshold_ratio
+
         try:
             self.margin_value = config.margin_value
         except:
@@ -108,7 +110,7 @@ class neighborhood_il:
                 # loss = self.update_neighbor_model(storage)
                 # wandb.log({"neighbor_model_loss": loss}, commit=False)
                 loss_info = agent.update_using_neighborhood_reward(
-                    storage, self.NeighborhoodNet, self.margin_value, self.bc_only, self.oracle_neighbor, self.discretize_reward
+                    storage, self.NeighborhoodNet, self.margin_value, self.bc_only, self.oracle_neighbor, self.discretize_reward, self.policy_threshold_ratio
                 )
                 wandb.log(loss_info, commit=False)
             wandb.log(

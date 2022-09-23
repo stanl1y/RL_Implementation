@@ -57,12 +57,14 @@ update_neighbor_frequency:
 update_neighbor_step:
   400
 update_neighbor_until:
-  150
+  500
 discretize_reward:
-  True
+  False
 log_name:
   ""
 duplicate_expert_last_state:
-  True
+  False
 data_name:
   ""
+policy_threshold_ratio:
+  0.5

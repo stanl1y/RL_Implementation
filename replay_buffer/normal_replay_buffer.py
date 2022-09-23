@@ -81,7 +81,7 @@ class normal_replay_buffer:
             ]
             path = onlyfiles[0]
         else:
-            path = f"./saved_expert_transition/{env_id}/{algo}/{data_name}.pkl"
+            path = f"./saved_expert_transition/{env_id}/{data_name}.pkl"
         with open(path, "rb") as handle:
             data = pickle.load(handle)
         print(f"load expert data from path : {path}")
