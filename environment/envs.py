@@ -25,7 +25,6 @@ def get_env(env_name,wrapper_type):
 
     else:
         env=gym.make(env_name)
-
     if wrapper_type=="basic":
         return BasicWrapper(env)
     elif wrapper_type=="gym_robotic":

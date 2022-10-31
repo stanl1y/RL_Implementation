@@ -36,7 +36,13 @@ class neighborhood_il:
         self.log_name = config.log_name
         self.duplicate_expert_last_state = config.duplicate_expert_last_state
         self.data_name=config.data_name
-        self.policy_threshold_ratio=config.policy_threshold_ratio
+        self.auto_threshold_ratio=config.auto_threshold_ratio
+        self.threshold_discount_factor=config.threshold_discount_factor
+        self.fix_env_random_seed=config.fix_env_random_seed
+        if self.auto_threshold_ratio:
+            self.policy_threshold_ratio=0.1
+        else:
+            self.policy_threshold_ratio=config.policy_threshold_ratio
 
         try:
             self.margin_value = config.margin_value
@@ -67,7 +73,7 @@ class neighborhood_il:
             done = False
             if(self.ood):
                 for _ in range(5):
-                    state, reward, done, info = env.step(1)#env.action_space.sample()
+                    state, reward, done, info = env.step(env.action_space.sample())#env.action_space.sample()
             while not done:
                 action = agent.act(state, testing=False)
                 # agent.q_network.reset_noise()
@@ -98,7 +104,10 @@ class neighborhood_il:
                 for _ in range(self.update_neighbor_step):
                     loss = self.update_neighbor_model(storage)
                     wandb.log({"neighbor_model_loss": loss}, commit=False)
-            state = env.reset()
+            if(self.fix_env_random_seed):
+                state = env.reset(seed=0)
+            else:
+                state = env.reset()
             done = False
             total_reward = 0
             while not done:
@@ -118,6 +127,7 @@ class neighborhood_il:
                     "training_reward": total_reward,
                     "episode_num": episode,
                     "buffer_size": len(storage),
+                    "threshold_ratio": self.policy_threshold_ratio,
                 }
             )
             if hasattr(agent, "update_epsilon"):
@@ -161,6 +171,9 @@ class neighborhood_il:
                 except:
                     pass
                 self.previous_checkpoint_path = file_path
+            if(self.auto_threshold_ratio):
+                self.policy_threshold_ratio*=self.threshold_discount_factor
+
 
     def update_neighbor_model(self, storage):
         state, action, reward, next_state, done = storage.sample(self.batch_size)

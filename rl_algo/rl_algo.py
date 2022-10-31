@@ -36,6 +36,7 @@ def get_rl_agent(env, config):
             tau=config.tau,
             batch_size=config.batch_size,
             use_ounoise=config.use_ounoise,
+            policy_type=config.policy_type,
         )
     elif config.algo == "td3":
         return td3(

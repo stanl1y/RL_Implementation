@@ -21,17 +21,17 @@ class collect_expert:
         agent.eval()
         if self.based_on_transition_num:
             done = False
-            state = env.reset()
             total_reward=0
             episode_reward=0
             episode_num=0
+            state = env.reset(seed=episode_num)
             while len(storage) < self.expert_transition_num:
                 if done:
-                    state = env.reset()
                     done = False
                     episode_num+=1
                     total_reward+=episode_reward
                     episode_reward=0
+                    state = env.reset(seed=episode_num)
                 action = agent.act(state, testing=True)
                 next_state, reward, done, info = env.step(action)
                 episode_reward+=reward
@@ -46,9 +46,9 @@ class collect_expert:
             )
         else:
             total_reward=0
-            for _ in range(self.expert_episode_num):
+            for e in range(self.expert_episode_num):
                 done = False
-                state = env.reset()
+                state = env.reset(seed=e)
                 while not done:
                     action = agent.act(state, testing=True)
                     next_state, reward, done, info = env.step(action)

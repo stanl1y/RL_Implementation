@@ -96,7 +96,7 @@ class discrete_sac(base_ac):
         filtered = 0
         if not bc_only and not train_expert_data:
             if threshold != None:
-                state_idx = torch.argwhere(reward.reshape(-1) < threshold)
+                state_idx = torch.argwhere(reward.reshape(-1) < threshold).reshape(-1)
                 policy_state = state[state_idx]
             else:
                 policy_state = state
