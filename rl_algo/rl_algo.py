@@ -85,5 +85,24 @@ def get_rl_agent(env, config):
             tau=config.tau,
             batch_size=config.batch_size,
         )
+    elif config.algo == "ppo":
+        return ppo(
+            observation_dim=env.get_observation_dim(),
+            action_dim=env.get_action_dim(),
+            action_lower=min(env.action_space.low),
+            action_upper=max(env.action_space.high),
+            hidden_dim=config.hidden_dim,
+            gamma=config.gamma,
+            lambda_decay=config.lambda_decay,
+            actor_optim=config.actor_optim,
+            critic_optim=config.critic_optim,
+            actor_lr=config.actor_lr,
+            critic_lr=config.critic_lr,
+            target_kl=config.target_kl,
+            ppo_clip_value=config.ppo_clip_value,
+            batch_size=config.batch_size,
+            max_policy_train_iters=config.max_policy_train_iters,
+            value_train_iters=config.value_train_iters,
+        )
     else:
         raise TypeError(f"rl agent type : {config.algo} not supported")

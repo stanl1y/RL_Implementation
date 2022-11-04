@@ -29,6 +29,7 @@ class base_agent:
         critic_lr=3e-4,
         tau=0.01,
         batch_size=256,
+        state_only_critic=False,
     ):
         self.observation_dim = observation_dim
         self.action_dim = action_dim
@@ -62,7 +63,10 @@ class base_agent:
             self.actor_target = None
 
         """critic"""
-        self.critic = [self.get_new_critic() for _ in range(self.critic_num)]
+        self.critic = [
+            self.get_new_critic(state_only=state_only_critic)
+            for _ in range(self.critic_num)
+        ]
         if critic_optim == "adam":
             self.critic_optimizer = [
                 torch.optim.Adam(model.parameters(), lr=critic_lr)
@@ -83,7 +87,7 @@ class base_agent:
         self.best_critic_optimizer = copy.deepcopy(self.critic_optimizer)
         self.previous_checkpoint_path = None
         self.train()
-    
+
     def train(self):
         self.actor.train()
 
@@ -114,10 +118,13 @@ class base_agent:
                 self.action_bias,
             ).to(device)
 
-    def get_new_critic(self):
-        return CriticNet(self.observation_dim + self.action_dim, self.hidden_dim, 1).to(
-            device
-        )
+    def get_new_critic(self, state_only=False):
+        if state_only:
+            return ValueNet(self.observation_dim, self.hidden_dim, 1).to(device)
+        else:
+            return CriticNet(
+                self.observation_dim + self.action_dim, self.hidden_dim, 1
+            ).to(device)
 
     def soft_update_target(self):
         if self.actor_target is not None:
@@ -238,6 +245,7 @@ class base_agent:
     def update(self):
         raise NotImplementedError
 
+
 class PrimitivePolicyNet(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super().__init__()
@@ -252,6 +260,7 @@ class PrimitivePolicyNet(nn.Module):
         x = F.relu(self.fc3(x))
         x = self.fc4(x)
         return x
+
 
 class DeterministicPolicyNet(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, action_scale, action_bias):
@@ -305,10 +314,19 @@ class StochasticPolicyNet(nn.Module):
         x_norm = torch.tanh(x)
         action = x_norm * self.action_scale + self.action_bias
         log_prob = dist.log_prob(x)
-        log_prob -= torch.log(self.action_scale * (1 - x_norm.pow(2)) + 1e-8)
         log_prob = log_prob.sum(-1, keepdim=True)
         mu = torch.tanh(mu) * self.action_scale + self.action_bias
         return action, log_prob, mu
+
+    def get_log_prob(self, x, action):
+        mu, logstd = self.forward(x)
+        std = logstd.exp()
+        dist = torch.distributions.normal.Normal(mu, std)
+        action = (action - self.action_bias) / self.action_scale
+        action = torch.atanh(torch.clip(action, max=0.999, min=-0.999))
+        log_prob = dist.log_prob(action)
+        log_prob = log_prob.sum(-1, keepdim=True)
+        return log_prob
 
 
 class CriticNet(nn.Module):
@@ -324,6 +342,22 @@ class CriticNet(nn.Module):
         a = a.float()
         x = torch.cat((s, a), 1)
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        x = self.fc4(x)
+        return x
+
+
+class ValueNet(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super().__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc4 = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, s):
+        x = F.relu(self.fc1(s))
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
         x = self.fc4(x)

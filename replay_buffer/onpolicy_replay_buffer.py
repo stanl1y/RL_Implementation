@@ -1,27 +1,76 @@
 import numpy as np
 import os
 import pickle
+import torch
+
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
 
 
-class normal_replay_buffer:
+class onpolicy_replay_buffer:
     def __init__(self, size, state_dim, action_dim):
         self.size = size
         self.storage_index = 0
         self.states = np.empty((size, state_dim))
         self.actions = np.empty((size, action_dim))
         self.rewards = np.empty((size, 1))
-        self.next_states = np.empty((size, state_dim))
+        self.values = np.empty((size, 1))
+        self.next_values = np.empty((size, 1))
+        self.log_probs = np.empty((size, 1))
         self.dones = np.empty((size, 1))
 
-    def store(self, s, a, r, ss, d):
+    def store(self, s, a, r, v, nv, lp, d):
         index = self.storage_index % self.size
         self.states[index] = s
         self.actions[index] = a
         self.rewards[index] = r
-        self.next_states[index] = ss
+        self.values[index] = v
+        self.next_values[index] = nv
+        self.log_probs[index] = lp
         self.dones[index] = d
         self.storage_index += 1
-    
+
+    def calculate_gae(self, gamma=0.99, decay=0.97):
+        """
+        Return the General Advantage Estimates from the given rewards and values.
+        Paper: https://arxiv.org/pdf/1506.02438.pdf
+        """
+        delta = []
+        for i in range(self.storage_index):
+            delta.append(
+                self.rewards[i]
+                + gamma * self.next_values[i] * (1 - self.dones[i])
+                - self.values[i]
+            )
+        # delta = np.array(delta)
+        # delta = (delta - delta.mean()) / (delta.std() + 1e-8)
+        gae = [delta[-1]]
+        for i in reversed(range(len(delta) - 1)):
+            gae.append(delta[i] + decay * gamma * gae[-1] * (1 - self.dones[i]))
+
+        self.gae = np.array(gae[::-1])
+
+    def discount_rewards(self, gamma=0.99, critic=None):
+        """
+        Return discounted rewards based on the given rewards and gamma param.
+        """
+        if self.dones[self.storage_index - 1] == True:
+            new_rewards = [float(self.rewards[self.storage_index - 1])]
+        else:
+            # if current episode is not done, use critic to estimate the value of current state
+            boostrapped_value = critic(
+                torch.FloatTensor(self.states[self.storage_index - 1])
+                .unsqueeze(0)
+                .to(device)
+            ).item()
+            new_rewards = [boostrapped_value]
+
+        for i in reversed(range(self.storage_index - 1)):
+            new_rewards.append(float(self.rewards[i]) + gamma * new_rewards[-1])
+        self.returns = np.array(new_rewards[::-1])[..., None]
+
     def clear(self):
         self.storage_index = 0
 
@@ -39,15 +88,21 @@ class normal_replay_buffer:
                 self.expert_dones[indices],
             )
         else:
-            index = np.random.randint(
-                min(self.storage_index, self.size), size=batch_size
-            )
+
+            if batch_size == -1:
+                indices = np.random.permutation(self.storage_index)
+            else:
+                indices = np.random.randint(
+                    min(self.storage_index, self.size), size=batch_size
+                )
             return (
-                self.states[index],
-                self.actions[index],
-                self.rewards[index],
-                self.next_states[index],
-                self.dones[index],
+                self.states[indices],
+                self.actions[indices],
+                self.rewards[indices],
+                self.values[indices],
+                self.log_probs[indices],
+                self.gae[indices],
+                self.returns[indices],
             )
 
     def write_storage(self, based_on_transition_num, expert_data_num, algo, env_id):
@@ -60,8 +115,8 @@ class normal_replay_buffer:
             "states": self.states[:save_idx],
             "actions": self.actions[:save_idx],
             "rewards": self.rewards[:save_idx],
-            "next_states": self.next_states[:save_idx],
-            "dones": self.dones[:save_idx],
+            "value": self.values[:save_idx],
+            "log_prob": self.log_probs[:save_idx],
         }
         if based_on_transition_num:
             file_name = f"transition_num{expert_data_num}.pkl"

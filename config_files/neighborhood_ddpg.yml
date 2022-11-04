@@ -22,7 +22,7 @@ actor_optim:
 critic_optim:
   adam
 policy_type:
-  primitive
+  deterministic
 td_length:
   1
 soft_update_target:
