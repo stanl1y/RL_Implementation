@@ -103,6 +103,11 @@ def get_rl_agent(env, config):
             batch_size=config.batch_size,
             max_policy_train_iters=config.max_policy_train_iters,
             value_train_iters=config.value_train_iters,
+            para_std=config.para_std,
+            action_std = config.action_std,
+            action_std_decay_rate = config.action_std_decay_rate,
+            min_action_std = config.min_action_std,
+            action_std_decay_freq = config.action_std_decay_freq,
         )
     else:
         raise TypeError(f"rl agent type : {config.algo} not supported")

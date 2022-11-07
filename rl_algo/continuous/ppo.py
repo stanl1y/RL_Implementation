@@ -32,6 +32,11 @@ class ppo(base_agent):
         max_policy_train_iters=80,
         value_train_iters=80,
         horizon=2048,
+        para_std=True,
+        action_std=0.6,
+        action_std_decay_rate=0.9,
+        min_action_std=0.1,
+        action_std_decay_freq=25000,
     ):
 
         super().__init__(
@@ -41,7 +46,7 @@ class ppo(base_agent):
             action_upper=action_upper,
             critic_num=1,
             hidden_dim=hidden_dim,
-            policy_type="stochastic",
+            policy_type="stochastic" if para_std else "fix_std_stochastic",
             actor_target=False,
             critic_target=False,
             gamma=gamma,
@@ -52,30 +57,46 @@ class ppo(base_agent):
             batch_size=batch_size,
             state_only_critic=True,
         )
+        self.para_std = para_std
+        self.action_std = action_std
         self.target_kl = target_kl
         self.ppo_clip_value = ppo_clip_value
         self.max_policy_train_iters = max_policy_train_iters
         self.value_train_iters = value_train_iters
         self.lambda_decay = lambda_decay
         self.horizon = horizon
+        self.action_std = action_std
+        self.action_std_decay_rate = action_std_decay_rate
+        self.min_action_std = min_action_std
+        self.action_std_decay_freq = action_std_decay_freq
 
     def act(self, state, testing=False):
         state = torch.FloatTensor(state).unsqueeze(0).to(device)
         with torch.no_grad():
-            action, log_prob, mu = self.actor.sample(state)
+            if self.para_std:
+                action, log_prob, mu = self.actor.sample(state)
+            else:
+                action, log_prob, mu = self.actor.sample(state, self.action_std)
+
         if not testing:
             return action[0].cpu().numpy(), log_prob[0].cpu().numpy()
         else:
             return mu[0].cpu().numpy()
 
-    def get_state_value(self,state):
+    def update_std(self):
+        self.action_std = max(
+            self.action_std * self.action_std_decay_rate, self.min_action_std
+        )
+
+    def get_state_value(self, state):
         value = (
-                    self.critic(torch.FloatTensor(state).unsqueeze(0).to(device))
-                    .detach()
-                    .cpu()
-                    .numpy()
-                )
+            self.critic(torch.FloatTensor(state).unsqueeze(0).to(device))
+            .detach()
+            .cpu()
+            .numpy()
+        )
         return value
+
     def update_critic(self, state, returns):
         for _ in range(self.value_train_iters):
             state_val = self.critic(state)
@@ -97,7 +118,12 @@ class ppo(base_agent):
         actor_loss = 0
         for _ in range(self.max_policy_train_iters):
             if policy_state.shape[0] > 0:
-                new_log_prob = self.actor.get_log_prob(policy_state, action)
+                if self.para_std:
+                    new_log_prob = self.actor.get_log_prob(policy_state, action)
+                else:
+                    new_log_prob = self.actor.get_log_prob(
+                        policy_state, action, self.action_std
+                    )
                 ratio = (new_log_prob - old_log_prob).exp()
                 surr1 = ratio * gae
                 surr2 = (
@@ -125,7 +151,10 @@ class ppo(base_agent):
                 self.actor.parameters(), lr=self.actor_lr
             )
             self.bc_criterion = nn.MSELoss()
-        action, log_prob, mu = self.actor.sample(expert_state)
+        if self.para_std:
+            action, log_prob, mu = self.actor.sample(expert_state)
+        else:
+            action, log_prob, mu = self.actor.sample(expert_state, self.action_std)
         bc_loss = self.bc_criterion(mu, expert_action)
 
         self.bc_optimizer.zero_grad()

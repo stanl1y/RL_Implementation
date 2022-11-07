@@ -12,21 +12,25 @@ gamma:
 lambda_decay:
   0.97
 target_kl:
-  0.01
+  0.005
+para_std:
+  False
 action_std:
   0.6
 action_std_decay_rate:
-  0.05
+  0.98
 min_action_std:
-  0.1
+  0.005
 action_std_decay_freq:
-  25000
+  50000
 ppo_clip_value:
-  0.2
+  0.3
 max_policy_train_iters:
   80
 value_train_iters:
   80
+standarize_reward:
+  True
 actor_optim:
   adam
 critic_optim:
@@ -37,6 +41,8 @@ critic_lr:
   0.001
 episodes:
   200
+horizon:
+  2048
 max_episode_step:
   2000
 train_agnet_period:

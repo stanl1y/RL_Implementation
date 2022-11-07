@@ -103,6 +103,14 @@ class base_agent:
                 self.action_scale,
                 self.action_bias,
             ).to(device)
+        elif policy_type == "fix_std_stochastic":
+            return FixStdStochasticPolicyNet(
+                self.observation_dim,
+                self.hidden_dim,
+                self.action_dim,
+                self.action_scale,
+                self.action_bias,
+            ).to(device)
         elif policy_type == "primitive":
             return PrimitivePolicyNet(
                 self.observation_dim,
@@ -321,6 +329,44 @@ class StochasticPolicyNet(nn.Module):
     def get_log_prob(self, x, action):
         mu, logstd = self.forward(x)
         std = logstd.exp()
+        dist = torch.distributions.normal.Normal(mu, std)
+        action = (action - self.action_bias) / self.action_scale
+        action = torch.atanh(torch.clip(action, max=0.999, min=-0.999))
+        log_prob = dist.log_prob(action)
+        log_prob = log_prob.sum(-1, keepdim=True)
+        return log_prob
+
+
+class FixStdStochasticPolicyNet(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim, action_scale, action_bias):
+        super().__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, hidden_dim)
+        self.mu = nn.Linear(hidden_dim, output_dim)
+        self.action_scale = action_scale
+        self.action_bias = action_bias
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        mu = self.mu(x)
+        return mu
+
+    def sample(self, x, std=0.1):
+        mu = self.forward(x)
+        dist = torch.distributions.normal.Normal(mu, std)
+        x = dist.rsample()
+        x_norm = torch.tanh(x)
+        action = x_norm * self.action_scale + self.action_bias
+        log_prob = dist.log_prob(x)
+        log_prob = log_prob.sum(-1, keepdim=True)
+        mu = torch.tanh(mu) * self.action_scale + self.action_bias
+        return action, log_prob, mu
+
+    def get_log_prob(self, x, action, std=0.1):
+        mu = self.forward(x)
         dist = torch.distributions.normal.Normal(mu, std)
         action = (action - self.action_bias) / self.action_scale
         action = torch.atanh(torch.clip(action, max=0.999, min=-0.999))
