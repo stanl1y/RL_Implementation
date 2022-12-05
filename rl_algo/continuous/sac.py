@@ -52,7 +52,7 @@ class sac(base_agent):
         )
         self.target_entropy = -action_dim
         self.log_alpha = nn.Parameter(torch.ones(1).to(device) * log_alpha_init)
-        # self.log_alpha.requires_grad = True
+        self.log_alpha.requires_grad = True
         self.alpha_lr = alpha_lr
         self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr)
         self.best_log_alpha_optimizer = copy.deepcopy(self.log_alpha_optimizer)
@@ -220,6 +220,7 @@ class sac(base_agent):
         NeighborhoodNet,
         margin_value,
         bc_only=False,
+        no_bc=False,
         oracle_neighbor=False,
         discretize_reward=False,
         policy_threshold_ratio=0.5,
@@ -286,7 +287,10 @@ class sac(base_agent):
             "expert_reward_mean": expert_reward_mean,
             "sampled_exp_reward_mean": reward.mean().item(),
         }
-        bc_loss = self.bc_update(expert_state, expert_action)
+        if no_bc:
+            bc_loss=0
+        else:
+            bc_loss = self.bc_update(expert_state, expert_action)
 
         self.soft_update_target()
         return {**actor_loss, **critic_loss, **tmp, **reward_dict, "bc_loss": bc_loss}
@@ -304,7 +308,7 @@ class sac(base_agent):
             self.log_alpha_optimizer.state_dict()
         )
 
-    def save_weight(self, best_testing_reward, algo, env_id, episodes):
+    def save_weight(self, best_testing_reward, algo, env_id, episodes, delete_prev_weight=True):
         dir_path = f"./trained_model/{algo}/{env_id}/"
         if not os.path.isdir(dir_path):
             os.makedirs(dir_path)
@@ -332,10 +336,11 @@ class sac(base_agent):
             data[f"critic_optimizer_state_dict{idx}"] = optimizer.state_dict()
 
         torch.save(data, file_path)
-        try:
-            os.remove(self.previous_checkpoint_path)
-        except:
-            pass
+        if delete_prev_weight and self.previous_checkpoint_path is not None:
+            try:
+                os.remove(self.previous_checkpoint_path)
+            except:
+                pass
         self.previous_checkpoint_path = file_path
 
     def load_weight(self, algo="sac", env_id=None, path=None):

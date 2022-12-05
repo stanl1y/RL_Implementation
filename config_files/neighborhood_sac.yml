@@ -10,6 +10,8 @@ wrapper_type:
   normobs
 bc_only:
   False
+no_bc:
+  True
 ood:
   True
 hidden_dim:
@@ -61,13 +63,13 @@ use_ounoise:
 log_alpha_init:
   !!float 0
 render:
-  False
+  True
 update_neighbor_frequency:
   3
 update_neighbor_step:
   400
 update_neighbor_until:
-  1000
+  1500
 discretize_reward:
   False
 log_name:
@@ -77,8 +79,10 @@ duplicate_expert_last_state:
 data_name:
   ""
 policy_threshold_ratio:
-  0.005
+  10
 auto_threshold_ratio:
   False
 threshold_discount_factor:
   0.995
+fix_env_random_seed:
+  False

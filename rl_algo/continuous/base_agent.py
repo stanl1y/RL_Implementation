@@ -322,6 +322,7 @@ class StochasticPolicyNet(nn.Module):
         x_norm = torch.tanh(x)
         action = x_norm * self.action_scale + self.action_bias
         log_prob = dist.log_prob(x)
+        log_prob -= torch.log(self.action_scale * (1 - x_norm.pow(2)) + 1e-8)
         log_prob = log_prob.sum(-1, keepdim=True)
         mu = torch.tanh(mu) * self.action_scale + self.action_bias
         return action, log_prob, mu

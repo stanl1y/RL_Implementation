@@ -1,5 +1,7 @@
 import wandb
 import numpy as np
+import os
+import imageio
 
 
 class vanilla_off_policy_training_stage:
@@ -11,23 +13,34 @@ class vanilla_off_policy_training_stage:
         self.env_id = config.env
         self.save_weight_period = config.save_weight_period
         self.continue_training = config.continue_training
+        self.render = config.render
+        self.delete_prev_weight=config.delete_prev_weight
         wandb.init(
             project="RL_Implementation",
             name=f"{self.algo}_{self.env_id}",
             config=config,
         )
 
-    def test(self, agent, env):
+    def test(self, agent, env, render_id=0):
         agent.eval()
         total_reward = 0
+        render=self.render and render_id%100==0
+        if render:
+            frame_buffer=[]
+            if not os.path.exists(f"./experiment_logs/{self.env_id}/{self.algo}/"):
+                os.makedirs(f"./experiment_logs/{self.env_id}/{self.algo}/")
         for i in range(3):
             state = env.reset()
             done = False
             while not done:
                 action = agent.act(state, testing=True)
                 next_state, reward, done, info = env.step(action)
+                if render:
+                    frame_buffer.append(env.render(mode='rgb_array'))
                 total_reward += reward
                 state = next_state
+        if render:
+            imageio.mimsave(f'./experiment_logs/{self.env_id}/{self.algo}/{render_id}.gif', frame_buffer)
         total_reward /= 3
         agent.train()
         return total_reward
@@ -73,7 +86,7 @@ class vanilla_off_policy_training_stage:
             )
 
             if i % 5 == 0:
-                testing_reward = self.test(agent, env)
+                testing_reward = self.test(agent, env, render_id=i if self.render else None)
                 if testing_reward > best_testing_reward:
                     agent.cache_weight()
                     best_testing_reward = testing_reward
@@ -81,7 +94,7 @@ class vanilla_off_policy_training_stage:
                 wandb.log({"testing_reward": testing_reward, "testing_episode_num": i})
             if i % self.save_weight_period == 0:
                 agent.save_weight(
-                    best_testing_reward, self.algo, self.env_id, best_episode
+                    best_testing_reward, self.algo, self.env_id, best_episode, delete_prev_weight=self.delete_prev_weight
                 )
         agent.save_weight(best_testing_reward, self.algo, self.env_id, best_episode)
 

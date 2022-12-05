@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import os
+import imageio
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -28,6 +29,7 @@ class neighborhood_il:
         self.neighbor_criteria = nn.BCELoss(reduction="none")
         self.ood = config.ood
         self.bc_only = config.bc_only
+        self.no_bc = config.no_bc
         self.update_neighbor_frequency = config.update_neighbor_frequency
         self.update_neighbor_step = config.update_neighbor_step
         self.update_neighbor_until = config.update_neighbor_until
@@ -35,14 +37,15 @@ class neighborhood_il:
         self.discretize_reward = config.discretize_reward
         self.log_name = config.log_name
         self.duplicate_expert_last_state = config.duplicate_expert_last_state
-        self.data_name=config.data_name
-        self.auto_threshold_ratio=config.auto_threshold_ratio
-        self.threshold_discount_factor=config.threshold_discount_factor
-        self.fix_env_random_seed=config.fix_env_random_seed
+        self.data_name = config.data_name
+        self.auto_threshold_ratio = config.auto_threshold_ratio
+        self.threshold_discount_factor = config.threshold_discount_factor
+        self.fix_env_random_seed = config.fix_env_random_seed
+        self.render = config.render
         if self.auto_threshold_ratio:
-            self.policy_threshold_ratio=0.1
+            self.policy_threshold_ratio = 0.1
         else:
-            self.policy_threshold_ratio=config.policy_threshold_ratio
+            self.policy_threshold_ratio = config.policy_threshold_ratio
 
         try:
             self.margin_value = config.margin_value
@@ -62,24 +65,40 @@ class neighborhood_il:
             self.NeighborhoodNet_optimizer = torch.optim.Adam(
                 self.NeighborhoodNet.parameters(), lr=3e-4
             )
-        storage.load_expert_data(algo=self.algo, env_id=self.env_id, duplicate_expert_last_state=self.duplicate_expert_last_state, data_name=self.data_name)
+        storage.load_expert_data(
+            algo=self.algo,
+            env_id=self.env_id,
+            duplicate_expert_last_state=self.duplicate_expert_last_state,
+            data_name=self.data_name,
+        )
         self.train(agent, env, storage)
 
-    def test(self, agent, env):
+    def test(self, agent, env, render_id=0):
         # agent.eval()
         total_reward = 0
+        render=self.render and render_id%40==0
+        if render:
+            frame_buffer=[]
+            if not os.path.exists(f"./experiment_logs/{self.env_id}/{self.log_name}/"):
+                os.makedirs(f"./experiment_logs/{self.env_id}/{self.log_name}/")
         for i in range(3):
             state = env.reset()
             done = False
-            if(self.ood):
+            if self.ood:
                 for _ in range(5):
-                    state, reward, done, info = env.step(env.action_space.sample())#env.action_space.sample()
+                    state, reward, done, info = env.step(
+                        env.action_space.sample()
+                    )  # env.action_space.sample()
             while not done:
                 action = agent.act(state, testing=False)
                 # agent.q_network.reset_noise()
                 next_state, reward, done, info = env.step(action)
+                if render:
+                    frame_buffer.append(env.render(mode='rgb_array'))
                 total_reward += reward
                 state = next_state
+        if render:
+            imageio.mimsave(f'./experiment_logs/{self.env_id}/{self.log_name}/{render_id}.gif', frame_buffer)
         total_reward /= 3
         # agent.train()
         return total_reward
@@ -100,11 +119,15 @@ class neighborhood_il:
         best_testing_reward = -1e7
         best_episode = 0
         for episode in range(self.episodes):
-            if not self.oracle_neighbor and episode % self.update_neighbor_frequency == 0 and episode <=self.update_neighbor_until:
+            if (
+                not self.oracle_neighbor
+                and episode % self.update_neighbor_frequency == 0
+                and episode <= self.update_neighbor_until
+            ):
                 for _ in range(self.update_neighbor_step):
                     loss = self.update_neighbor_model(storage)
                     wandb.log({"neighbor_model_loss": loss}, commit=False)
-            if(self.fix_env_random_seed):
+            if self.fix_env_random_seed:
                 state = env.reset(seed=0)
             else:
                 state = env.reset()
@@ -119,7 +142,14 @@ class neighborhood_il:
                 # loss = self.update_neighbor_model(storage)
                 # wandb.log({"neighbor_model_loss": loss}, commit=False)
                 loss_info = agent.update_using_neighborhood_reward(
-                    storage, self.NeighborhoodNet, self.margin_value, self.bc_only, self.oracle_neighbor, self.discretize_reward, self.policy_threshold_ratio
+                    storage,
+                    self.NeighborhoodNet,
+                    self.margin_value,
+                    self.bc_only,
+                    self.no_bc,
+                    self.oracle_neighbor,
+                    self.discretize_reward,
+                    self.policy_threshold_ratio,
                 )
                 wandb.log(loss_info, commit=False)
             wandb.log(
@@ -134,7 +164,7 @@ class neighborhood_il:
                 agent.update_epsilon()
 
             if episode % 5 == 0:
-                testing_reward = self.test(agent, env)
+                testing_reward = self.test(agent, env, render_id=episode if self.render else None)
                 if testing_reward > best_testing_reward:
                     agent.cache_weight()
                     best_testing_reward = testing_reward
@@ -149,7 +179,7 @@ class neighborhood_il:
                         storage,
                         f"./experiment_logs/{self.env_id}{self.log_name}/",
                         episode,
-                        self.oracle_neighbor
+                        self.oracle_neighbor,
                     )
             if episode % self.save_weight_period == 0 and not self.oracle_neighbor:
                 agent.save_weight(
@@ -171,11 +201,10 @@ class neighborhood_il:
                 except:
                     pass
                 self.previous_checkpoint_path = file_path
-            if(self.auto_threshold_ratio):
-                self.policy_threshold_ratio*=self.threshold_discount_factor
+            if self.auto_threshold_ratio:
+                self.policy_threshold_ratio *= self.threshold_discount_factor
 
-
-    def update_neighbor_model(self, storage):
+    def update_neighbor_model(self, storage, use_expert=False):
         state, action, reward, next_state, done = storage.sample(self.batch_size)
         state = torch.FloatTensor(state).to(device)
         next_state = torch.FloatTensor(next_state).to(device)
@@ -187,10 +216,10 @@ class neighborhood_il:
             .view((-1, 1))
             .to(device)
         )
-        
+
         posivite = self.NeighborhoodNet(torch.cat((state, next_state), axis=1))
         negative = self.NeighborhoodNet(torch.cat((state, next_state_shift), axis=1))
-        
+
         loss_weight = (
             torch.cat(
                 (
@@ -207,6 +236,19 @@ class neighborhood_il:
         self.NeighborhoodNet_optimizer.zero_grad()
         loss.backward()
         self.NeighborhoodNet_optimizer.step()
+        if use_expert:
+            state, action, reward, next_state, done = storage.sample(-1, expert=True)
+            state = torch.FloatTensor(state).to(device)
+            next_state = torch.FloatTensor(next_state).to(device)
+            label = torch.FloatTensor(np.ones(state.shape[0])).view((-1, 1)).to(device)
+
+            posivite = self.NeighborhoodNet(torch.cat((state, next_state), axis=1))
+            # predict positive samples
+            loss = self.neighbor_criteria(posivite, label)
+            self.NeighborhoodNet_optimizer.zero_grad()
+            loss.backward()
+            self.NeighborhoodNet_optimizer.step()
         return loss.item()
 
-#CUDA_VISIBLE_DEVICES=0 python3 main.py --main_stage neighborhood_il --main_task neighborhood_dsac --env LunarLander-v2 --wrapper basic --episode 2000 --log_name expectile99_ac_duplicateLast_nextStateReward_disReward
+
+# CUDA_VISIBLE_DEVICES=0 python3 main.py --main_stage neighborhood_il --main_task neighborhood_dsac --env LunarLander-v2 --wrapper basic --episode 2000 --log_name expectile99_ac_duplicateLast_nextStateReward_disReward
