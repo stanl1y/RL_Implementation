@@ -68,7 +68,13 @@ def get_config():
     parser.add_argument(
         "--data_name",
         type=str,
+        default="",
         help="nane of expert data",
+    )
+    parser.add_argument(
+        "--weight_path",
+        type=str,
+        help="path of trained model weight",
     )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
@@ -82,9 +88,8 @@ if __name__ == "__main__":
     agent = get_rl_agent(env, config)
     storage = get_replay_buffer(env, config)
     main_fn = get_main_stage(config)
-    if hasattr(config,"util"):
-        util_dict=get_util(env, config)
+    if hasattr(config, "util"):
+        util_dict = get_util(env, config)
         main_fn.start(agent, env, storage, util_dict)
     else:
         main_fn.start(agent, env, storage)
-

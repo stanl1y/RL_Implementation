@@ -21,7 +21,7 @@ class normal_replay_buffer:
         self.next_states[index] = ss
         self.dones[index] = d
         self.storage_index += 1
-    
+
     def clear(self):
         self.storage_index = 0
 
@@ -50,7 +50,11 @@ class normal_replay_buffer:
                 self.dones[index],
             )
 
-    def write_storage(self, based_on_transition_num, expert_data_num, algo, env_id):
+    def write_storage(
+        self, based_on_transition_num, expert_data_num, algo, env_id, data_name=""
+    ):
+        if data_name != "":
+            data_name = f"_{data_name}"
         path = f"./saved_expert_transition/{env_id}/{algo}/"
         if not os.path.isdir(path):
             os.makedirs(path)
@@ -64,9 +68,9 @@ class normal_replay_buffer:
             "dones": self.dones[:save_idx],
         }
         if based_on_transition_num:
-            file_name = f"transition_num{expert_data_num}.pkl"
+            file_name = f"transition_num{expert_data_num}{data_name}.pkl"
         else:
-            file_name = f"episode_num{expert_data_num}.pkl"
+            file_name = f"episode_num{expert_data_num}{data_name}.pkl"
         print(os.path.join(path, file_name))
         with open(os.path.join(path, file_name), "wb") as handle:
             pickle.dump(data, handle)
