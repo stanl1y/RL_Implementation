@@ -33,6 +33,11 @@ class vanilla_off_policy_training_stage:
             state = env.reset()
             done = False
             while not done:
+                if self.goal_condition:
+                    state = np.append(
+                        state["observation"],
+                        state["desired_goal"],
+                    )
                 action = agent.act(state, testing=True)
                 next_state, reward, done, info = env.step(action)
                 if render:
@@ -53,8 +58,9 @@ class vanilla_off_policy_training_stage:
             agent.load_weight(self.env_id)
         if self.buffer_warmup:
             state = env.reset()
+            self.goal_condition=type(state)==dict
             done = False
-            while len(storage) < self.buffer_warmup_step:
+            while len(storage) < self.buffer_warmup_step//1000:# because HER buffer's len is num of rollout
                 action = env.action_space.sample()
                 next_state, reward, done, info = env.step(action)
                 storage.store(state, action, reward, next_state, done)
@@ -70,7 +76,12 @@ class vanilla_off_policy_training_stage:
             done = False
             total_reward = 0
             while not done:
-                action = agent.act(state)
+                if self.goal_condition:
+                    state_c = np.append(
+                        state["observation"],
+                        state["desired_goal"],
+                    )
+                action = agent.act(state_c)
                 next_state, reward, done, info = env.step(action)
                 total_reward += reward
                 storage.store(state, action, reward, next_state, done)
@@ -84,7 +95,6 @@ class vanilla_off_policy_training_stage:
                     "buffer_size": len(storage),
                 }
             )
-
             if i % 5 == 0:
                 testing_reward = self.test(agent, env, render_id=i if self.render else None)
                 if testing_reward > best_testing_reward:

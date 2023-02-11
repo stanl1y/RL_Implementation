@@ -42,10 +42,18 @@ class HERWrapper(BasicWrapper):
             + observation_space["observation"].shape[0]
         )
 
-class NormObs(ObservationWrapper, BasicWrapper):
+    def get_state_dim(self):
+        observation_space = self.env.observation_space
+        return observation_space["observation"].shape[0]
 
+    def get_goal_dim(self):
+        observation_space = self.env.observation_space
+        return observation_space["desired_goal"].shape[0]
+
+
+class NormObs(ObservationWrapper, BasicWrapper):
     def __init__(self, env):
         super(NormObs, self).__init__(env)
-        
+
     def observation(self, obs):
-        return (obs-(self.maze_size/2))/self.maze_size
+        return (obs - (self.maze_size / 2)) / self.maze_size

@@ -76,6 +76,11 @@ def get_config():
         type=str,
         help="path of trained model weight",
     )
+    parser.add_argument(
+        "--buffer_type",
+        type=str,
+        help="what kind of replay buffer",
+    )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 

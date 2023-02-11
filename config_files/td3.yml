@@ -41,6 +41,8 @@ buffer_warmup_step:
   2000
 save_weight_period:
   50
+delete_prev_weight:
+  False
 policy_update_delay:
   2
 use_ounoise:

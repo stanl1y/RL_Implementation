@@ -273,7 +273,7 @@ class ddpg(base_agent):
         self.best_critic.load_state_dict(self.critic.state_dict())
         self.best_critic_optimizer.load_state_dict(self.critic_optimizer.state_dict())
 
-    def save_weight(self, best_testing_reward, algo, env_id, episodes):
+    def save_weight(self, best_testing_reward, algo, env_id, episodes, delete_prev_weight=True):
         dir_path = f"./trained_model/{algo}/{env_id}/"
         if not os.path.isdir(dir_path):
             os.makedirs(dir_path)
@@ -295,10 +295,11 @@ class ddpg(base_agent):
         }
 
         torch.save(data, file_path)
-        try:
-            os.remove(self.previous_checkpoint_path)
-        except:
-            pass
+        if delete_prev_weight and self.previous_checkpoint_path is not None:
+            try:
+                os.remove(self.previous_checkpoint_path)
+            except:
+                pass
         self.previous_checkpoint_path = file_path
 
     def load_weight(self, algo="ddpg", env_id=None, path=None):
