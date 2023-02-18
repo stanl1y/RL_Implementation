@@ -42,6 +42,9 @@ class neighborhood_il:
         self.threshold_discount_factor = config.threshold_discount_factor
         self.fix_env_random_seed = config.fix_env_random_seed
         self.render = config.render
+        self.hard_negative_sampling = config.hard_negative_sampling
+        if self.hard_negative_sampling:
+            print("hard negative sampling")
         if self.auto_threshold_ratio:
             self.policy_threshold_ratio = 0.1
         else:
@@ -76,9 +79,9 @@ class neighborhood_il:
     def test(self, agent, env, render_id=0):
         # agent.eval()
         total_reward = 0
-        render=self.render and render_id%40==0
+        render = self.render and render_id % 40 == 0
         if render:
-            frame_buffer=[]
+            frame_buffer = []
             if not os.path.exists(f"./experiment_logs/{self.env_id}/{self.log_name}/"):
                 os.makedirs(f"./experiment_logs/{self.env_id}/{self.log_name}/")
         for i in range(3):
@@ -94,11 +97,14 @@ class neighborhood_il:
                 # agent.q_network.reset_noise()
                 next_state, reward, done, info = env.step(action)
                 if render:
-                    frame_buffer.append(env.render(mode='rgb_array'))
+                    frame_buffer.append(env.render(mode="rgb_array"))
                 total_reward += reward
                 state = next_state
         if render:
-            imageio.mimsave(f'./experiment_logs/{self.env_id}/{self.log_name}/{render_id}.gif', frame_buffer)
+            imageio.mimsave(
+                f"./experiment_logs/{self.env_id}/{self.log_name}/{render_id}.gif",
+                frame_buffer,
+            )
         total_reward /= 3
         # agent.train()
         return total_reward
@@ -164,7 +170,9 @@ class neighborhood_il:
                 agent.update_epsilon()
 
             if episode % 5 == 0:
-                testing_reward = self.test(agent, env, render_id=episode if self.render else None)
+                testing_reward = self.test(
+                    agent, env, render_id=episode if self.render else None
+                )
                 if testing_reward > best_testing_reward:
                     agent.cache_weight()
                     best_testing_reward = testing_reward
@@ -211,7 +219,14 @@ class neighborhood_il:
         next_state_shift = torch.roll(next_state, 1, 0)  # for negative samples
         label = (
             torch.FloatTensor(
-                np.concatenate((np.ones(state.shape[0]), np.zeros(state.shape[0])))
+                np.concatenate(
+                    (
+                        np.ones(state.shape[0]),
+                        np.zeros(
+                            state.shape[0] * (2 if self.hard_negative_sampling else 1)
+                        ),
+                    )
+                )
             )
             .view((-1, 1))
             .to(device)
@@ -219,19 +234,31 @@ class neighborhood_il:
 
         posivite = self.NeighborhoodNet(torch.cat((state, next_state), axis=1))
         negative = self.NeighborhoodNet(torch.cat((state, next_state_shift), axis=1))
-
+        if self.hard_negative_sampling:
+            negative_hard = self.NeighborhoodNet(torch.cat((next_state, state), axis=1))
         loss_weight = (
             torch.cat(
                 (
                     torch.ones(state.shape[0]) * self.neighbor_model_alpha,
-                    torch.ones(state.shape[0]) * (1 - self.neighbor_model_alpha),
+                    torch.ones(
+                        state.shape[0] * (2 if self.hard_negative_sampling else 1)
+                    )
+                    * (1 - self.neighbor_model_alpha),
                 )
             )
             .view((-1, 1))
             .to(device)
         )
         # predict positive samples
-        loss = self.neighbor_criteria(torch.cat((posivite, negative), axis=0), label)
+        loss = self.neighbor_criteria(
+            torch.cat(
+                (posivite, negative, negative_hard)
+                if self.hard_negative_sampling
+                else (posivite, negative),
+                axis=0,
+            ),
+            label,
+        )
         loss = torch.mean(loss * loss_weight)
         self.NeighborhoodNet_optimizer.zero_grad()
         loss.backward()

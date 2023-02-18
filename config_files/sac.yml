@@ -50,4 +50,4 @@ use_ounoise:
 log_alpha_init:
   !!float 0
 render:
-  False
+  Falsed

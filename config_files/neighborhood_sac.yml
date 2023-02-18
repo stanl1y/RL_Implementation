@@ -11,9 +11,9 @@ wrapper_type:
 bc_only:
   False
 no_bc:
-  True
+  False
 ood:
-  True
+  False
 hidden_dim:
   256
 gamma:
@@ -63,13 +63,13 @@ use_ounoise:
 log_alpha_init:
   !!float 0
 render:
-  True
+  False
 update_neighbor_frequency:
   3
 update_neighbor_step:
   400
 update_neighbor_until:
-  1500
+  500
 discretize_reward:
   False
 log_name:
@@ -79,10 +79,12 @@ duplicate_expert_last_state:
 data_name:
   ""
 policy_threshold_ratio:
-  10
+  0.005
 auto_threshold_ratio:
   False
 threshold_discount_factor:
   0.995
 fix_env_random_seed:
+  False
+hard_negative_sampling:
   False
