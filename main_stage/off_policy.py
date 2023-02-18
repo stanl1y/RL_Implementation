@@ -81,7 +81,9 @@ class vanilla_off_policy_training_stage:
                         state["observation"],
                         state["desired_goal"],
                     )
-                action = agent.act(state_c)
+                    action = agent.act(state_c)
+                else:
+                    action = agent.act(state)
                 next_state, reward, done, info = env.step(action)
                 total_reward += reward
                 storage.store(state, action, reward, next_state, done)

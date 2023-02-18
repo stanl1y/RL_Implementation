@@ -28,7 +28,7 @@ seed:
 save_every:
   10
 batch_size:
-  256
+  512
 buffer_size:
   1000000
 buffer_type:
@@ -40,7 +40,7 @@ buffer_warmup:
 continue_training:
   False
 buffer_warmup_step:
-  2000
+  10000
 save_weight_period:
   50
 delete_prev_weight:
@@ -50,4 +50,4 @@ use_ounoise:
 log_alpha_init:
   !!float 0
 render:
-  Falsed
+  True
