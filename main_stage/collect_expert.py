@@ -17,6 +17,7 @@ class collect_expert:
         self.env_id = config.env
         self.data_name = config.data_name
         self.weight_path = config.weight_path
+        self.save_env_states = config.save_env_states
 
     def start(self, agent, env, storage):
         if self.weight_path:
@@ -37,10 +38,13 @@ class collect_expert:
                     total_reward += episode_reward
                     episode_reward = 0
                     state = env.reset(seed=episode_num)
+                env_state = env.sim.get_state() if self.save_env_states else None
                 action = agent.act(state, testing=True)
                 next_state, reward, done, info = env.step(action)
                 episode_reward += reward
-                storage.store(state, action, reward, next_state, done)
+                storage.store(
+                    state, action, reward, next_state, done, env_state=env_state
+                )
                 state = next_state
             avg_reward = round(total_reward / max(episode_num, 1), 4)
             print(f"expert data recording finish, average reward : {avg_reward}")
@@ -57,10 +61,13 @@ class collect_expert:
                 done = False
                 state = env.reset(seed=e)
                 while not done:
+                    env_state = env.sim.get_state() if self.save_env_states else None
                     action = agent.act(state, testing=True)
                     next_state, reward, done, info = env.step(action)
                     total_reward += reward
-                    storage.store(state, action, reward, next_state, done)
+                    storage.store(
+                        state, action, reward, next_state, done, env_state=env_state
+                    )
                     state = next_state
             avg_reward = round(total_reward / self.expert_episode_num, 4)
             print(f"expert data recording finish, average reward : {avg_reward}")

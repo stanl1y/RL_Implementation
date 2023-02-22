@@ -69,7 +69,7 @@ update_neighbor_frequency:
 update_neighbor_step:
   400
 update_neighbor_until:
-  500
+  1500
 discretize_reward:
   False
 log_name:
@@ -87,4 +87,4 @@ threshold_discount_factor:
 fix_env_random_seed:
   False
 hard_negative_sampling:
-  False
+  True

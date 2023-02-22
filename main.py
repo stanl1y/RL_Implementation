@@ -48,6 +48,9 @@ def get_config():
     parser.add_argument(
         "--expert_transition_num", type=int, help="number of expert data"
     )
+    parser.add_argument(
+        "--save_env_states", action="store_true", help="store the env state for 'set_state' or not"
+    )
     parser.add_argument("--expert_episode_num", type=int, help="number of expert data")
     parser.add_argument(
         "--buffer_warmup_step",
@@ -69,7 +72,7 @@ def get_config():
         "--data_name",
         type=str,
         default="",
-        help="nane of expert data",
+        help="name of expert data",
     )
     parser.add_argument(
         "--weight_path",

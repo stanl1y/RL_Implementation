@@ -4,7 +4,7 @@ import pickle
 
 
 class normal_replay_buffer:
-    def __init__(self, size, state_dim, action_dim):
+    def __init__(self, size, state_dim, action_dim, save_env_states=False):
         self.size = size
         self.storage_index = 0
         self.states = np.empty((size, state_dim))
@@ -12,14 +12,18 @@ class normal_replay_buffer:
         self.rewards = np.empty((size, 1))
         self.next_states = np.empty((size, state_dim))
         self.dones = np.empty((size, 1))
+        self.env_states = [] if save_env_states else None
+            
 
-    def store(self, s, a, r, ss, d):
+    def store(self, s, a, r, ss, d, env_state=None):
         index = self.storage_index % self.size
         self.states[index] = s
         self.actions[index] = a
         self.rewards[index] = r
         self.next_states[index] = ss
         self.dones[index] = d
+        if env_state is not None:
+            self.env_states.append(env_state)
         self.storage_index += 1
 
     def clear(self):
@@ -31,24 +35,44 @@ class normal_replay_buffer:
                 indices = np.random.permutation(len(self.expert_states))
             else:
                 indices = np.random.choice(len(self.expert_states), batch_size)
-            return (
-                self.expert_states[indices],
-                self.expert_actions[indices],
-                self.expert_rewards[indices],
-                self.expert_next_states[indices],
-                self.expert_dones[indices],
-            )
+            if self.env_states:
+                return (
+                    self.expert_states[indices],
+                    self.expert_actions[indices],
+                    self.expert_rewards[indices],
+                    self.expert_next_states[indices],
+                    self.expert_dones[indices],
+                    self.env_states[indices]
+                )
+            else:
+                return (
+                    self.expert_states[indices],
+                    self.expert_actions[indices],
+                    self.expert_rewards[indices],
+                    self.expert_next_states[indices],
+                    self.expert_dones[indices],
+                )
         else:
-            index = np.random.randint(
+            indices = np.random.randint(
                 min(self.storage_index, self.size), size=batch_size
             )
-            return (
-                self.states[index],
-                self.actions[index],
-                self.rewards[index],
-                self.next_states[index],
-                self.dones[index],
-            )
+            if self.env_states:
+                return (
+                    self.states[indices],
+                    self.actions[indices],
+                    self.rewards[indices],
+                    self.next_states[indices],
+                    self.dones[indices],
+                    self.env_states[indices],
+                )
+            else:
+                return (
+                    self.states[indices],
+                    self.actions[indices],
+                    self.rewards[indices],
+                    self.next_states[indices],
+                    self.dones[indices],
+                )
 
     def write_storage(
         self, based_on_transition_num, expert_data_num, algo, env_id, data_name=""
@@ -66,6 +90,7 @@ class normal_replay_buffer:
             "rewards": self.rewards[:save_idx],
             "next_states": self.next_states[:save_idx],
             "dones": self.dones[:save_idx],
+            "env_states": self.env_states[:save_idx] if self.env_states else None,
         }
         if based_on_transition_num:
             file_name = f"transition_num{expert_data_num}{data_name}.pkl"
@@ -97,6 +122,8 @@ class normal_replay_buffer:
         self.expert_rewards = data["rewards"]
         self.expert_next_states = data["next_states"]
         self.expert_dones = data["dones"]
+        if "env_states" in data.keys():
+            self.env_states = data["env_states"]
         if duplicate_expert_last_state:
             done_idx = np.argwhere(self.expert_dones.reshape(-1) == 1).reshape(-1)
             done_expert_states = self.expert_states[done_idx]
