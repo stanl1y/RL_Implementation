@@ -13,7 +13,7 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-
+#test
 class set_state_il:
     def __init__(self, config):
         """get neighbor model config"""
