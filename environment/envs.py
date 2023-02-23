@@ -4,7 +4,7 @@ from .custom_env import *
 
           
 
-def get_env(env_name,wrapper_type):
+def get_env(env_name,wrapper_type,terminate_when_unhealthy=False):
     if env_name in ["highway-v0","merge-v0","roundabout-v0","parking-v0","intersection-v0","racetrack-v0"]:
         '''
         highway_env:
@@ -24,7 +24,11 @@ def get_env(env_name,wrapper_type):
             env=gym.make(env_name,**dict(random_reset=True))
 
     else:
-        env=gym.make(env_name)
+        try:
+            env=gym.make(env_name,terminate_when_unhealthy=terminate_when_unhealthy)
+            print(f"terminate_when_unhealthy:{terminate_when_unhealthy}")
+        except:
+            env=gym.make(env_name)
     if wrapper_type=="basic":
         return BasicWrapper(env)
     elif wrapper_type=="gym_robotic":

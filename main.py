@@ -92,7 +92,7 @@ def get_config():
 
 if __name__ == "__main__":
     config, config_text = get_config()
-    env = get_env(config.env, config.wrapper_type)
+    env = get_env(config.env, config.wrapper_type, config.terminate_when_unhealthy)
     agent = get_rl_agent(env, config)
     storage = get_replay_buffer(env, config)
     main_fn = get_main_stage(config)
