@@ -43,6 +43,7 @@ class neighborhood_il:
         self.fix_env_random_seed = config.fix_env_random_seed
         self.render = config.render
         self.hard_negative_sampling = config.hard_negative_sampling
+        self.use_env_done = config.use_env_done
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -156,6 +157,7 @@ class neighborhood_il:
                     self.oracle_neighbor,
                     self.discretize_reward,
                     self.policy_threshold_ratio,
+                    self.use_env_done,
                 )
                 wandb.log(loss_info, commit=False)
             wandb.log(

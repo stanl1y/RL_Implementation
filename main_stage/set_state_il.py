@@ -13,7 +13,7 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-#test
+
 class set_state_il:
     def __init__(self, config):
         """get neighbor model config"""
@@ -43,6 +43,8 @@ class set_state_il:
         self.fix_env_random_seed = config.fix_env_random_seed
         self.render = config.render
         self.hard_negative_sampling = config.hard_negative_sampling
+        self.explore_step = config.explore_step
+        self.use_env_done = config.use_env_done
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -56,7 +58,7 @@ class set_state_il:
             self.margin_value = 0.1
         wandb.init(
             project="Neighborhood",
-            name=f"{self.env_id}{self.log_name}",
+            name=f"set_state_{self.env_id}{self.log_name}",
             config=config,
         )
 
@@ -156,6 +158,7 @@ class set_state_il:
                     self.oracle_neighbor,
                     self.discretize_reward,
                     self.policy_threshold_ratio,
+                    self.use_env_done,
                 )
                 wandb.log(loss_info, commit=False)
             wandb.log(

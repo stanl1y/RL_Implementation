@@ -1,4 +1,32 @@
-import numpy as np
-import pickle
-
-
+import gym
+import time
+t=time.time()
+env=gym.make("HalfCheetah-v3")
+print(f"make:{time.time()-t}")
+t=time.time()
+obs=env.reset()
+print(f"reset:{time.time()-t}")
+t=time.time()
+state=env.sim.get_state()
+print(f"get state:{time.time()-t}")
+t=time.time()
+_,_,_,_=env.step(env.action_space.sample())
+print(f"a1:{time.time()-t}")
+t=time.time()
+_,_,_,_=env.step(env.action_space.sample())
+print(f"a2:{time.time()-t}")
+t=time.time()
+_,_,_,_=env.step(env.action_space.sample())
+print(f"a3:{time.time()-t}")
+t=time.time()
+env.sim.set_state(state)
+print(f"set_state:{time.time()-t}")
+t=time.time()
+env.sim.forward()
+print(f"forward:{time.time()-t}")
+_,_,_,_=env.step(env.action_space.sample())
+print(f"a4:{time.time()-t}")
+t=time.time()
+_=env.render(mode="rgb_array")
+print(f"render:{time.time()-t}")
+t=time.time()

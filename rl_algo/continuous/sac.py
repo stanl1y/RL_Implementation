@@ -224,6 +224,7 @@ class sac(base_agent):
         oracle_neighbor=False,
         discretize_reward=False,
         policy_threshold_ratio=0.5,
+        use_env_done=False,
     ):
         """sample agent data"""
         state, action, _, next_state, done = storage.sample(self.batch_size)
@@ -235,9 +236,12 @@ class sac(base_agent):
         state = torch.FloatTensor(state).to(device)
         action = torch.FloatTensor(action).to(device)
         next_state = torch.FloatTensor(next_state).to(device)
-        done = torch.FloatTensor(np.zeros_like(done)).to(
-            device
-        )  # try to use no done in imitation learning
+        if use_env_done:
+            done = torch.FloatTensor(done).to(device)
+        else:
+            done = torch.FloatTensor(np.zeros_like(done)).to(
+                device
+            )  # try to use no done in imitation learning
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             self.batch_size, expert=True
         )
