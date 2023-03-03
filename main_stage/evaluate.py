@@ -31,24 +31,30 @@ class evaluate:
                     os.makedirs(
                         f"./experiment_logs/{self.env_id}/{self.algo}_eval_ood/"
                     )
-                    save_dir = f"./experiment_logs/{self.env_id}/{self.algo}_eval_ood/"
+                save_dir = f"./experiment_logs/{self.env_id}/{self.algo}_eval_ood/"
             else:
                 if not os.path.exists(
                     f"./experiment_logs/{self.env_id}/{self.algo}_eval/"
                 ):
                     os.makedirs(f"./experiment_logs/{self.env_id}/{self.algo}_eval/")
-                    save_dir = f"./experiment_logs/{self.env_id}/{self.algo}_eval/"
+                save_dir = f"./experiment_logs/{self.env_id}/{self.algo}_eval/"
         for i in range(self.episodes):
             state = env.reset()
             done = False
             total_reward = 0
             if self.ood:
-                for _ in range(10):
+                for _ in range(500):
                     state, reward, done, info = env.step(
-                        env.action_space.sample()
+                        action = agent.act(state, testing=True)
                     )  # env.action_space.sample()
+                    total_reward += reward
                     if render:
                         frame_buffer.append(env.render(mode="rgb_array"))
+                for _ in range(20):
+                    state, reward, done, info = env.step(
+                        env.action_space.sample()
+                    )
+                    total_reward += reward
             while not done:
                 action = agent.act(state, testing=True)
                 next_state, reward, done, info = env.step(action)
@@ -56,6 +62,23 @@ class evaluate:
                     frame_buffer.append(env.render(mode="rgb_array"))
                 total_reward += reward
                 state = next_state
+
+
+            # if self.ood:
+            #     for _ in range(10):
+            #         state, reward, done, info = env.step(
+            #             env.action_space.sample()
+            #         )  # env.action_space.sample()
+            #         if render:
+            #             frame_buffer.append(env.render(mode="rgb_array"))
+            #         total_reward += reward
+            # while not done:
+            #     action = agent.act(state, testing=True)
+            #     next_state, reward, done, info = env.step(action)
+            #     if render:
+            #         frame_buffer.append(env.render(mode="rgb_array"))
+            #     total_reward += reward
+            #     state = next_state
             if render:
                 imageio.mimsave(
                     f"{save_dir}{i}.gif",

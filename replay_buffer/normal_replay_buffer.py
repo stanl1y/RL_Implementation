@@ -4,7 +4,9 @@ import pickle
 
 
 class normal_replay_buffer:
-    def __init__(self, size, state_dim, action_dim, save_env_states=False):
+    def __init__(
+        self, size, state_dim, action_dim, save_env_states=False, save_state_idx=False
+    ):
         self.size = size
         self.storage_index = 0
         self.states = np.empty((size, state_dim))
@@ -13,9 +15,9 @@ class normal_replay_buffer:
         self.next_states = np.empty((size, state_dim))
         self.dones = np.empty((size, 1))
         self.env_states = [] if save_env_states else None
-            
+        self.states_idx = np.empty((size, 1), dtype=int) if save_state_idx else None
 
-    def store(self, s, a, r, ss, d, env_state=None):
+    def store(self, s, a, r, ss, d, env_state=None, state_idx=None):
         index = self.storage_index % self.size
         self.states[index] = s
         self.actions[index] = a
@@ -24,55 +26,55 @@ class normal_replay_buffer:
         self.dones[index] = d
         if env_state is not None:
             self.env_states.append(env_state)
+        if state_idx is not None:
+            self.states_idx[index] = state_idx
         self.storage_index += 1
 
     def clear(self):
         self.storage_index = 0
 
-    def sample(self, batch_size, expert=False):
+    def sample(
+        self,
+        batch_size,
+        expert=False,
+        return_idx=False,
+        return_expert_env_states=False,
+        exclude_tail_num=0,
+    ):
         if expert:
             if batch_size == -1:
-                indices = np.random.permutation(len(self.expert_states))
-            else:
-                indices = np.random.choice(len(self.expert_states), batch_size)
-            if self.env_states:
-                return (
-                    self.expert_states[indices],
-                    self.expert_actions[indices],
-                    self.expert_rewards[indices],
-                    self.expert_next_states[indices],
-                    self.expert_dones[indices],
-                    self.env_states[indices]
+                indices = np.random.permutation(
+                    len(self.expert_states) - exclude_tail_num
                 )
             else:
-                return (
-                    self.expert_states[indices],
-                    self.expert_actions[indices],
-                    self.expert_rewards[indices],
-                    self.expert_next_states[indices],
-                    self.expert_dones[indices],
+                indices = np.random.choice(
+                    len(self.expert_states) - exclude_tail_num, batch_size
                 )
+            tmp = (
+                self.expert_states[indices],
+                self.expert_actions[indices],
+                self.expert_rewards[indices],
+                self.expert_next_states[indices],
+                self.expert_dones[indices],
+            )
+            if return_expert_env_states:
+                tmp = tmp + (self.expert_env_states[indices.item()],)
+            if return_idx:
+                tmp = tmp + (indices,)
         else:
             indices = np.random.randint(
                 min(self.storage_index, self.size), size=batch_size
             )
-            if self.env_states:
-                return (
-                    self.states[indices],
-                    self.actions[indices],
-                    self.rewards[indices],
-                    self.next_states[indices],
-                    self.dones[indices],
-                    self.env_states[indices],
-                )
-            else:
-                return (
-                    self.states[indices],
-                    self.actions[indices],
-                    self.rewards[indices],
-                    self.next_states[indices],
-                    self.dones[indices],
-                )
+            tmp = (
+                self.states[indices],
+                self.actions[indices],
+                self.rewards[indices],
+                self.next_states[indices],
+                self.dones[indices],
+            )
+            if return_idx:
+                tmp = tmp + (self.states_idx[indices],)
+        return tmp
 
     def write_storage(
         self, based_on_transition_num, expert_data_num, algo, env_id, data_name=""
@@ -123,7 +125,7 @@ class normal_replay_buffer:
         self.expert_next_states = data["next_states"]
         self.expert_dones = data["dones"]
         if "env_states" in data.keys():
-            self.env_states = data["env_states"]
+            self.expert_env_states = data["env_states"]
         if duplicate_expert_last_state:
             done_idx = np.argwhere(self.expert_dones.reshape(-1) == 1).reshape(-1)
             done_expert_states = self.expert_states[done_idx]

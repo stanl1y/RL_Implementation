@@ -9,6 +9,7 @@ def get_replay_buffer(env, config):
             state_dim=env.get_observation_dim(),
             action_dim=env.get_action_dim() if env.is_continuous() else 1,
             save_env_states=config.save_env_states,
+            save_state_idx=config.save_state_idx,
         )
     elif config.buffer_type == "onpolicy":
         return onpolicy_replay_buffer(

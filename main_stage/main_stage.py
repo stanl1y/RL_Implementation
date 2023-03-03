@@ -4,6 +4,7 @@ from .neighborhood_il import neighborhood_il
 from .collect_toy_oracle import collect_toy_oracle
 from .on_policy import vanilla_on_policy_training_stage
 from .evaluate import evaluate
+from .set_state_il import set_state_il
 
 def get_main_stage(config):
     if config.main_stage_type == "off_policy":
@@ -20,6 +21,8 @@ def get_main_stage(config):
         return vanilla_on_policy_training_stage(config)
     elif config.main_stage_type == "evaluate":
         return evaluate(config)
+    elif config.main_stage_type == "set_state_il":
+        return set_state_il(config)
     else:
         raise TypeError(
             f"training stage type : {config.training_stage_type} not supported"

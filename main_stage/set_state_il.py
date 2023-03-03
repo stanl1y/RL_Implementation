@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 import imageio
+import copy
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -52,14 +53,24 @@ class set_state_il:
         else:
             self.policy_threshold_ratio = config.policy_threshold_ratio
 
-        try:
-            self.margin_value = config.margin_value
-        except:
-            self.margin_value = 0.1
         wandb.init(
             project="Neighborhood",
             name=f"set_state_{self.env_id}{self.log_name}",
             config=config,
+        )
+
+    def gen_reward_calc_expert_data(self, storage):
+        expert_next_states = copy.deepcopy(storage.expert_next_states)
+        strides = expert_next_states.strides
+        # https://tinyurl.com/2zgc7mcb
+        self.expert_ns_data = np.lib.stride_tricks.as_strided(
+            expert_next_states,
+            shape=(
+                len(storage.expert_next_states) - (self.explore_step - 1),
+                self.explore_step,
+                expert_next_states.shape[-1],
+            ),
+            strides=(strides[0], strides[0], strides[1]),
         )
 
     def start(self, agent, env, storage, util_dict):
@@ -76,6 +87,7 @@ class set_state_il:
             duplicate_expert_last_state=self.duplicate_expert_last_state,
             data_name=self.data_name,
         )
+        self.gen_reward_calc_expert_data(storage)
         self.train(agent, env, storage)
 
     def test(self, agent, env, render_id=0):
@@ -112,18 +124,34 @@ class set_state_il:
         return total_reward
 
     def train(self, agent, env, storage):
+        if self.fix_env_random_seed:
+            _ = env.reset(seed=0)
+        else:
+            _ = env.reset()
+        done = False
         if self.buffer_warmup:
-            state = env.reset()
-            done = False
             while len(storage) < self.buffer_warmup_step:
-                action = agent.act(state)
-                next_state, reward, done, info = env.step(action)
-                storage.store(state, action, reward, next_state, done)
-                if done:
-                    state = env.reset()
-                    done = False
-                else:
-                    state = next_state
+                done = True
+                while done:
+                    # to avoid we sample the last expert state (terminated because time horizon) as the first state
+                    obs, _, _, _, done, expert_env_state, idx = storage.sample(
+                        batch_size=1,
+                        expert=True,
+                        return_idx=True,
+                        return_expert_env_states=True,
+                        exclude_tail_num=self.explore_step - 1,
+                    )
+                env.sim.set_state(expert_env_state)
+                env.sim.forward()
+                for _ in range(self.explore_step):
+                    action = env.action_space.sample()
+                    next_obs, reward, done, info = env.step(action)
+                    storage.store(
+                        obs, action, reward, next_obs, done, state_idx=idx.item()
+                    )
+                    obs = next_obs
+                    if done:
+                        break
         best_testing_reward = -1e7
         best_episode = 0
         for episode in range(self.episodes):
@@ -135,32 +163,46 @@ class set_state_il:
                 for _ in range(self.update_neighbor_step):
                     loss = self.update_neighbor_model(storage)
                     wandb.log({"neighbor_model_loss": loss}, commit=False)
+            done = True
+            while done:
+                # to avoid we sample the last expert state (terminated because time horizon) as the first state
+                obs, _, _, _, done, expert_env_state, idx = storage.sample(
+                    batch_size=1,
+                    expert=True,
+                    return_idx=True,
+                    return_expert_env_states=True,
+                    exclude_tail_num=self.explore_step - 1,
+                )
+                obs = obs[0]
             if self.fix_env_random_seed:
-                state = env.reset(seed=0)
+                _ = env.reset(seed=0)
             else:
-                state = env.reset()
-            done = False
+                _ = env.reset()
+            env.sim.set_state(expert_env_state)
+            env.sim.forward()
             total_reward = 0
-            while not done:
-                action = agent.act(state)
-                next_state, reward, done, info = env.step(action)
+            for _ in range(self.explore_step):
+                action = agent.act(obs)
+                next_obs, reward, done, info = env.step(action)
                 total_reward += reward
-                storage.store(state, action, reward, next_state, done)
-                state = next_state
+                storage.store(obs, action, reward, next_obs, done, state_idx=idx.item())
+                obs = next_obs
                 # loss = self.update_neighbor_model(storage)
                 # wandb.log({"neighbor_model_loss": loss}, commit=False)
-                loss_info = agent.update_using_neighborhood_reward(
+                loss_info = agent.update_using_set_state_neighborhood_reward(
                     storage,
                     self.NeighborhoodNet,
-                    self.margin_value,
+                    self.expert_ns_data,
+                    self.explore_step,
                     self.bc_only,
                     self.no_bc,
                     self.oracle_neighbor,
-                    self.discretize_reward,
                     self.policy_threshold_ratio,
                     self.use_env_done,
                 )
                 wandb.log(loss_info, commit=False)
+                if done:
+                    break
             wandb.log(
                 {
                     "training_reward": total_reward,

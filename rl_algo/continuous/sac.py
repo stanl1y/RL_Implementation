@@ -115,8 +115,8 @@ class sac(base_agent):
         else:
             policy_state = state
         filtered = state.shape[0] - policy_state.shape[0]
-        actor_loss=0
-        alpha_loss=0
+        actor_loss = 0
+        alpha_loss = 0
         if policy_state.shape[0] > 0:
             action, log_prob, mu = self.actor.sample(policy_state)
             q_val = [critic(policy_state, action) for critic in self.critic]
@@ -127,11 +127,18 @@ class sac(base_agent):
             self.actor_optimizer.step()
 
             """update alpha"""
-            alpha_loss = (self.alpha * (-log_prob - self.target_entropy).detach()).mean()
+            alpha_loss = (
+                self.alpha * (-log_prob - self.target_entropy).detach()
+            ).mean()
             self.log_alpha_optimizer.zero_grad()
             alpha_loss.backward()
             self.log_alpha_optimizer.step()
-        return {"actor_loss": actor_loss, "alpha_loss": alpha_loss, "alpha": self.alpha, "filtered": filtered}
+        return {
+            "actor_loss": actor_loss,
+            "alpha_loss": alpha_loss,
+            "alpha": self.alpha,
+            "filtered": filtered,
+        }
 
     def bc_update(self, expert_state, expert_action):
         # if not hasattr(self, "bc_optimizer") or not hasattr(self, "bc_criterion"):
@@ -170,18 +177,134 @@ class sac(base_agent):
         #     "alpha": self.alpha,
         # }
 
+    def set_state_neighborhood_reward(
+        self, NeighborhoodNet, expert_ns_data, next_state, state_idx, explore_step
+    ):
+
+        """construct a tensor that looks like
+        |s'^a_1, s^e_1|
+        |s'^a_1, s^e_2|
+        |s'^a_1, s^e_3|
+        | ......
+        |s'^a_m, s^e_{n-1}|
+        |s'^a_m, s^e_n|
+
+        it is in the shape (len(state)*len(expert_state), 2*observation_dim)
+        """
+        cartesian_product_state = np.concatenate(
+            (
+                np.repeat(next_state, explore_step, axis=0),
+                expert_ns_data[state_idx].reshape((-1, expert_ns_data.shape[-1])),
+            ),
+            axis=1,
+        )
+        cartesian_product_state = torch.FloatTensor(cartesian_product_state).to(device)
+
+        with torch.no_grad():
+            prob = NeighborhoodNet(cartesian_product_state)
+            # prob is in the shape of (len(next_state)*len(expert_state), 1)
+            reward = prob.reshape((len(next_state), -1))
+            reward,_ = torch.max(reward, dim=1, keepdim=True)
+        return reward
+
+    def update_using_set_state_neighborhood_reward(
+        self,
+        storage,
+        NeighborhoodNet,
+        expert_ns_data,
+        explore_step,
+        bc_only=False,
+        no_bc=False,
+        oracle_neighbor=False,
+        policy_threshold_ratio=0.5,
+        use_env_done=False,
+    ):
+        """sample agent data"""
+        state, action, _, next_state, done, state_idx = storage.sample(
+            self.batch_size, return_idx=True
+        )
+        reward = self.set_state_neighborhood_reward(
+            NeighborhoodNet, expert_ns_data, next_state, state_idx, explore_step
+        )
+
+        state = torch.FloatTensor(state).to(device)
+        action = torch.FloatTensor(action).to(device)
+        next_state = torch.FloatTensor(next_state).to(device)
+        if use_env_done:
+            done = torch.FloatTensor(done).to(device)
+        else:
+            done = torch.FloatTensor(np.zeros_like(done)).to(device)
+            # try to use no done in imitation learning
+
+        (
+            expert_state,
+            expert_action,
+            _,
+            expert_next_state,
+            expert_done,
+            expert_state_idx,
+        ) = storage.sample(self.batch_size, expert=True, return_idx=True, exclude_tail_num=explore_step-1)
+        expert_reward = self.set_state_neighborhood_reward(
+            NeighborhoodNet,
+            expert_ns_data,
+            expert_next_state,
+            expert_state_idx,
+            explore_step,
+        )
+        expert_state = torch.FloatTensor(expert_state).to(device)
+        expert_action = torch.FloatTensor(expert_action).to(device)
+        expert_next_state = torch.FloatTensor(expert_next_state).to(device)
+        expert_done = torch.FloatTensor(np.zeros_like(expert_done)).to(device)
+        expert_reward_mean = expert_reward.mean().item()
+
+        actor_loss = {}
+        if not bc_only:
+            actor_loss = self.update_actor(
+                state,
+                reward=reward,
+                threshold=expert_reward_mean * policy_threshold_ratio,
+            )
+        critic_loss = self.update_critic(
+            state,
+            action,
+            reward,
+            next_state,
+            done,
+        )
+        expert_critic_loss = self.update_critic(
+            expert_state,
+            expert_action,
+            expert_reward,  # can be changed to all ones
+            expert_next_state,
+            expert_done,
+        )
+        expert_keys = {
+            "expert_critic0_loss": "critic0_loss",
+            "expert_critic1_loss": "critic1_loss",
+        }
+        tmp = dict(
+            (key, expert_critic_loss[expert_keys[key]]) for key in expert_keys.keys()
+        )
+        reward_dict = {
+            "expert_reward_mean": expert_reward_mean,
+            "sampled_exp_reward_mean": reward.mean().item(),
+        }
+        if no_bc:
+            bc_loss = 0
+        else:
+            bc_loss = self.bc_update(expert_state, expert_action)
+
+        self.soft_update_target()
+        return {**actor_loss, **critic_loss, **tmp, **reward_dict, "bc_loss": bc_loss}
+
     def neighborhood_reward(
         self,
         NeighborhoodNet,
-        storage,
+        expert_ns_data,
         next_state,
         oracle_neighbor,
         discretize_reward=False,
     ):
-        """sample expert data"""
-        expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
-            -1, expert=True
-        )
 
         """construct a tensor that looks like
         |s'^a_1, s^e_1|
@@ -196,8 +319,8 @@ class sac(base_agent):
 
         cartesian_product_state = np.concatenate(
             (
-                np.repeat(next_state, len(expert_next_state), axis=0),
-                np.tile(expert_next_state, (len(next_state), 1)),
+                np.repeat(next_state, len(expert_ns_data)//self.batch_size, axis=0),
+                expert_ns_data,
             ),
             axis=1,
         )
@@ -209,7 +332,7 @@ class sac(base_agent):
         if discretize_reward:
             prob[prob > 0.5] = 0.5
             prob[prob <= 0.5] = 0
-        reward = prob.reshape((len(next_state), len(expert_next_state))).sum(
+        reward = prob.reshape((len(next_state), -1)).sum(
             axis=1, keepdims=True
         )
         return reward
@@ -218,6 +341,7 @@ class sac(base_agent):
         self,
         storage,
         NeighborhoodNet,
+        expert_ns_data,
         margin_value,
         bc_only=False,
         no_bc=False,
@@ -230,7 +354,7 @@ class sac(base_agent):
         state, action, _, next_state, done = storage.sample(self.batch_size)
 
         reward = self.neighborhood_reward(
-            NeighborhoodNet, storage, next_state, oracle_neighbor, discretize_reward
+            NeighborhoodNet, expert_ns_data, next_state, oracle_neighbor, discretize_reward
         )
 
         state = torch.FloatTensor(state).to(device)
@@ -248,7 +372,7 @@ class sac(base_agent):
 
         expert_reward = self.neighborhood_reward(
             NeighborhoodNet,
-            storage,
+            expert_ns_data,
             expert_next_state,
             oracle_neighbor,
             discretize_reward,
@@ -292,7 +416,7 @@ class sac(base_agent):
             "sampled_exp_reward_mean": reward.mean().item(),
         }
         if no_bc:
-            bc_loss=0
+            bc_loss = 0
         else:
             bc_loss = self.bc_update(expert_state, expert_action)
 
@@ -312,7 +436,9 @@ class sac(base_agent):
             self.log_alpha_optimizer.state_dict()
         )
 
-    def save_weight(self, best_testing_reward, algo, env_id, episodes, delete_prev_weight=True):
+    def save_weight(
+        self, best_testing_reward, algo, env_id, episodes, delete_prev_weight=True
+    ):
         dir_path = f"./trained_model/{algo}/{env_id}/"
         if not os.path.isdir(dir_path):
             os.makedirs(dir_path)

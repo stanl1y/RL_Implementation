@@ -52,4 +52,8 @@ log_alpha_init:
 render:
   True
 ood:
+  True
+terminate_when_unhealthy:
+  True
+save_state_idx:
   False

@@ -60,7 +60,11 @@ class neighborhood_il:
             name=f"{self.env_id}{self.log_name}",
             config=config,
         )
-
+    def gen_reward_calc_expert_data(self, storage):
+        expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
+            -1, expert=True
+        )
+        self.expert_ns_data=np.tile(expert_next_state, (self.batch_size, 1))
     def start(self, agent, env, storage, util_dict):
         if self.oracle_neighbor:
             self.NeighborhoodNet = util_dict["OracleNeighborhoodNet"].to(device)
@@ -75,6 +79,7 @@ class neighborhood_il:
             duplicate_expert_last_state=self.duplicate_expert_last_state,
             data_name=self.data_name,
         )
+        self.gen_reward_calc_expert_data(storage)
         self.train(agent, env, storage)
 
     def test(self, agent, env, render_id=0):
@@ -151,6 +156,7 @@ class neighborhood_il:
                 loss_info = agent.update_using_neighborhood_reward(
                     storage,
                     self.NeighborhoodNet,
+                    self.expert_ns_data,
                     self.margin_value,
                     self.bc_only,
                     self.no_bc,
