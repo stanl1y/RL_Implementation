@@ -91,7 +91,7 @@ hard_negative_sampling:
 terminate_when_unhealthy:
   False
 explore_step:
-  100
+  5
 use_env_done:
   False
 save_state_idx:

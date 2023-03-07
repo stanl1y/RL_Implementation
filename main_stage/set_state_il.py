@@ -66,7 +66,7 @@ class set_state_il:
         self.expert_ns_data = np.lib.stride_tricks.as_strided(
             expert_next_states,
             shape=(
-                len(storage.expert_next_states) - (self.explore_step - 1),
+                len(expert_next_states) - (self.explore_step - 1),
                 self.explore_step,
                 expert_next_states.shape[-1],
             ),
@@ -124,11 +124,6 @@ class set_state_il:
         return total_reward
 
     def train(self, agent, env, storage):
-        if self.fix_env_random_seed:
-            _ = env.reset(seed=0)
-        else:
-            _ = env.reset()
-        done = False
         if self.buffer_warmup:
             while len(storage) < self.buffer_warmup_step:
                 done = True
@@ -141,6 +136,10 @@ class set_state_il:
                         return_expert_env_states=True,
                         exclude_tail_num=self.explore_step - 1,
                     )
+                if self.fix_env_random_seed:
+                    _ = env.reset(seed=0)
+                else:
+                    _ = env.reset()
                 env.sim.set_state(expert_env_state)
                 env.sim.forward()
                 for _ in range(self.explore_step):

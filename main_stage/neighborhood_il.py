@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 import imageio
+import time
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -131,6 +132,7 @@ class neighborhood_il:
         best_testing_reward = -1e7
         best_episode = 0
         for episode in range(self.episodes):
+            t=time.time()
             if (
                 not self.oracle_neighbor
                 and episode % self.update_neighbor_frequency == 0
@@ -139,17 +141,25 @@ class neighborhood_il:
                 for _ in range(self.update_neighbor_step):
                     loss = self.update_neighbor_model(storage)
                     wandb.log({"neighbor_model_loss": loss}, commit=False)
+                print(f"update neighbor model time: {time.time()-t}")
             if self.fix_env_random_seed:
                 state = env.reset(seed=0)
             else:
                 state = env.reset()
             done = False
             total_reward = 0
+            t=time.time()
             while not done:
                 action = agent.act(state)
+                print(f"agent act time: {time.time()-t}")
+                t=time.time()
                 next_state, reward, done, info = env.step(action)
+                print(f"env step time: {time.time()-t}")
+                t=time.time()
                 total_reward += reward
                 storage.store(state, action, reward, next_state, done)
+                print(f"store time: {time.time()-t}")
+                t=time.time()
                 state = next_state
                 # loss = self.update_neighbor_model(storage)
                 # wandb.log({"neighbor_model_loss": loss}, commit=False)
@@ -165,7 +175,11 @@ class neighborhood_il:
                     self.policy_threshold_ratio,
                     self.use_env_done,
                 )
+                print(f"update time: {time.time()-t}")
+                t=time.time()
                 wandb.log(loss_info, commit=False)
+                print(f"log time: {time.time()-t}")
+                t=time.time()
             wandb.log(
                 {
                     "training_reward": total_reward,
@@ -174,6 +188,8 @@ class neighborhood_il:
                     "threshold_ratio": self.policy_threshold_ratio,
                 }
             )
+            print(f"log time: {time.time()-t}")
+            t=time.time()
             if hasattr(agent, "update_epsilon"):
                 agent.update_epsilon()
 
@@ -197,6 +213,8 @@ class neighborhood_il:
                         episode,
                         self.oracle_neighbor,
                     )
+                print(f"test time: {time.time()-t}")
+                t=time.time()
             if episode % self.save_weight_period == 0 and not self.oracle_neighbor:
                 agent.save_weight(
                     best_testing_reward, "neighborhood_il", self.env_id, best_episode
