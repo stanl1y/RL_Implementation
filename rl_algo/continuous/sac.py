@@ -178,6 +178,37 @@ class sac(base_agent):
         #     "alpha": self.alpha,
         # }
 
+    def set_state_neighborhood_reward_cuda(
+        self, NeighborhoodNet, expert_ns_data, next_state, state_idx, explore_step
+    ):
+
+        """construct a tensor that looks like
+        |s'^a_1, s^e_1|
+        |s'^a_1, s^e_2|
+        |s'^a_1, s^e_3|
+        | ......
+        |s'^a_m, s^e_{n-1}|
+        |s'^a_m, s^e_n|
+
+        it is in the shape (len(state)*len(expert_state), 2*observation_dim)
+        """
+        next_state=torch.FloatTensor(next_state).to(device)
+
+        cartesian_product_state = torch.cat(
+            (
+                torch.repeat_interleave(next_state, explore_step, dim=0),
+                expert_ns_data[state_idx].reshape((-1, expert_ns_data.shape[-1])),
+            ),
+            dim=1,
+        )
+
+        with torch.no_grad():
+            prob = NeighborhoodNet(cartesian_product_state)
+            # prob is in the shape of (len(next_state)*len(expert_state), 1)
+            reward = prob.reshape((len(next_state), -1))
+            reward,_ = torch.max(reward, dim=1, keepdim=True)
+        return reward
+
     def set_state_neighborhood_reward(
         self, NeighborhoodNet, expert_ns_data, next_state, state_idx, explore_step
     ):
@@ -224,7 +255,7 @@ class sac(base_agent):
         state, action, _, next_state, done, state_idx = storage.sample(
             self.batch_size, return_idx=True
         )
-        reward = self.set_state_neighborhood_reward(
+        reward = self.set_state_neighborhood_reward_cuda(
             NeighborhoodNet, expert_ns_data, next_state, state_idx, explore_step
         )
 
@@ -245,7 +276,7 @@ class sac(base_agent):
             expert_done,
             expert_state_idx,
         ) = storage.sample(self.batch_size, expert=True, return_idx=True, exclude_tail_num=explore_step-1)
-        expert_reward = self.set_state_neighborhood_reward(
+        expert_reward = self.set_state_neighborhood_reward_cuda(
             NeighborhoodNet,
             expert_ns_data,
             expert_next_state,
@@ -317,23 +348,25 @@ class sac(base_agent):
 
         it is in the shape (len(state)*len(expert_state), 2*observation_dim)
         """
-        print("in neighborhood reward")
+        # print("in neighborhood reward")
         t= time.time()
-        cartesian_product_state = np.concatenate(
+        next_state=torch.FloatTensor(next_state).to(device)
+        # print("next_state to device time", time.time()-t)
+        t= time.time()
+        cartesian_product_state = torch.cat(
             (
-                np.repeat(next_state, len(expert_ns_data)//self.batch_size, axis=0),
+                torch.repeat_interleave(next_state, len(expert_ns_data)//self.batch_size, dim=0),
                 expert_ns_data,
             ),
-            axis=1,
+            dim=1,
         )
-        print("concatenate time", time.time()-t)
+        # print("concatenate time", time.time()-t)
         t= time.time()
-        cartesian_product_state = torch.FloatTensor(cartesian_product_state).to(device)
 
         with torch.no_grad():
             prob = NeighborhoodNet(cartesian_product_state)
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
-            print("prob time", time.time()-t)
+            # print("prob time", time.time()-t)
             t= time.time()
         if discretize_reward:
             prob[prob > 0.5] = 0.5
@@ -341,8 +374,8 @@ class sac(base_agent):
         reward = prob.reshape((len(next_state), -1)).sum(
             axis=1, keepdims=True
         )
-        print("reshape time", time.time()-t)
-        print("end neighborhood reward")
+        # print("reshape time", time.time()-t)
+        # print("end neighborhood reward")
         return reward
 
     def neighborhood_reward(
@@ -364,7 +397,7 @@ class sac(base_agent):
 
         it is in the shape (len(state)*len(expert_state), 2*observation_dim)
         """
-        print("in neighborhood reward")
+        # print("in neighborhood reward")
         t= time.time()
         cartesian_product_state = np.concatenate(
             (
@@ -373,14 +406,14 @@ class sac(base_agent):
             ),
             axis=1,
         )
-        print("concatenate time", time.time()-t)
+        # print("concatenate time", time.time()-t)
         t= time.time()
         cartesian_product_state = torch.FloatTensor(cartesian_product_state).to(device)
 
         with torch.no_grad():
             prob = NeighborhoodNet(cartesian_product_state)
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
-            print("prob time", time.time()-t)
+            # print("prob time", time.time()-t)
             t= time.time()
         if discretize_reward:
             prob[prob > 0.5] = 0.5
@@ -388,8 +421,8 @@ class sac(base_agent):
         reward = prob.reshape((len(next_state), -1)).sum(
             axis=1, keepdims=True
         )
-        print("reshape time", time.time()-t)
-        print("end neighborhood reward")
+        # print("reshape time", time.time()-t)
+        # print("end neighborhood reward")
         return reward
 
     def update_using_neighborhood_reward(
@@ -405,17 +438,17 @@ class sac(base_agent):
         policy_threshold_ratio=0.5,
         use_env_done=False,
     ):
-        print("in update_using_neighborhood_reward")
-        t=time.time()
+        # print("in update_using_neighborhood_reward")
+        # t=time.time()
         """sample agent data"""
         state, action, _, next_state, done = storage.sample(self.batch_size)
-        print("sample time", time.time()-t)
-        t=time.time()
-        reward = self.neighborhood_reward(
+        # print("sample time", time.time()-t)
+        # t=time.time()
+        reward = self.neighborhood_reward_cuda(
             NeighborhoodNet, expert_ns_data, next_state, oracle_neighbor, discretize_reward
         )
-        print("neighborhood reward time", time.time()-t)
-        t=time.time()
+        # print("neighborhood reward time", time.time()-t)
+        # t=time.time()
         state = torch.FloatTensor(state).to(device)
         action = torch.FloatTensor(action).to(device)
         next_state = torch.FloatTensor(next_state).to(device)
@@ -425,22 +458,22 @@ class sac(base_agent):
             done = torch.FloatTensor(np.zeros_like(done)).to(
                 device
             )  # try to use no done in imitation learning
-        print("to tensor and device time", time.time()-t)
-        t=time.time()
+        # print("to tensor and device time", time.time()-t)
+        # t=time.time()
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             self.batch_size, expert=True
         )
-        print("expert sample time", time.time()-t)
-        t=time.time()
-        expert_reward = self.neighborhood_reward(
+        # print("expert sample time", time.time()-t)
+        # t=time.time()
+        expert_reward = self.neighborhood_reward_cuda(
             NeighborhoodNet,
             expert_ns_data,
             expert_next_state,
             oracle_neighbor,
             discretize_reward,
         )
-        print("expert neighborhood reward time", time.time()-t)
-        t=time.time()
+        # print("expert neighborhood reward time", time.time()-t)
+        # t=time.time()
         expert_state = torch.FloatTensor(expert_state).to(device)
         expert_action = torch.FloatTensor(expert_action).to(device)
         expert_next_state = torch.FloatTensor(expert_next_state).to(device)
@@ -454,8 +487,8 @@ class sac(base_agent):
                 reward=reward,
                 threshold=expert_reward_mean * policy_threshold_ratio,
             )
-        print("update actor time", time.time()-t)
-        t=time.time()
+        # print("update actor time", time.time()-t)
+        # t=time.time()
         critic_loss = self.update_critic(
             state,
             action,
@@ -463,8 +496,8 @@ class sac(base_agent):
             next_state,
             done,
         )
-        print("update critic time", time.time()-t)
-        t=time.time()
+        # print("update critic time", time.time()-t)
+        # t=time.time()
         expert_critic_loss = self.update_critic(
             expert_state,
             expert_action,
@@ -472,8 +505,8 @@ class sac(base_agent):
             expert_next_state,
             expert_done,
         )
-        print("update expert critic time", time.time()-t)
-        t=time.time()
+        # print("update expert critic time", time.time()-t)
+        # t=time.time()
         expert_keys = {
             "expert_critic0_loss": "critic0_loss",
             "expert_critic1_loss": "critic1_loss",
@@ -489,10 +522,10 @@ class sac(base_agent):
             bc_loss = 0
         else:
             bc_loss = self.bc_update(expert_state, expert_action)
-        print("update bc time", time.time()-t)
-        t=time.time()
+        # print("update bc time", time.time()-t)
+        # t=time.time()
         self.soft_update_target()
-        print("end update_using_neighborhood_reward")
+        # print("end update_using_neighborhood_reward")
         return {**actor_loss, **critic_loss, **tmp, **reward_dict, "bc_loss": bc_loss}
 
     def cache_weight(self):

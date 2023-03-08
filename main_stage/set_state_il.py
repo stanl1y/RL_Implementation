@@ -72,6 +72,7 @@ class set_state_il:
             ),
             strides=(strides[0], strides[0], strides[1]),
         )
+        self.expert_ns_data = torch.FloatTensor(self.expert_ns_data).to(device)
 
     def start(self, agent, env, storage, util_dict):
         if self.oracle_neighbor:
