@@ -61,12 +61,53 @@ class neighborhood_il:
             name=f"{self.env_id}{self.log_name}",
             config=config,
         )
-    def gen_reward_calc_expert_data(self, storage):
+
+    def gen_data(self, storage):
+        """
+        generate expert next state data for reward calculation
+        """
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             -1, expert=True
         )
-        self.expert_ns_data=np.tile(expert_next_state, (self.batch_size, 1))
-        self.expert_ns_data=torch.FloatTensor(self.expert_ns_data).to(device)
+        if storage.to_tensor:
+            self.expert_ns_data = torch.tile(
+                expert_next_state, (self.batch_size, 1)
+            ).to(device)
+        else:
+            self.expert_ns_data = np.tile(expert_next_state, (self.batch_size, 1))
+            self.expert_ns_data = torch.FloatTensor(self.expert_ns_data).to(device)
+
+        """
+        generate label and weight for neighbor model training
+        """
+        self.update_neighor_label = (
+            torch.FloatTensor(
+                np.concatenate(
+                    (
+                        np.ones(self.batch_size),
+                        np.zeros(
+                            self.batch_size * (2 if self.hard_negative_sampling else 1)
+                        ),
+                    )
+                )
+            )
+            .view((-1, 1))
+            .to(device)
+        )
+        self.neighbor_loss_weight = (
+            torch.cat(
+                (
+                    torch.ones(self.batch_size) * self.neighbor_model_alpha,
+                    torch.ones(
+                        self.batch_size * (2 if self.hard_negative_sampling else 1)
+                    )
+                    * (1 - self.neighbor_model_alpha),
+                )
+            )
+            .view((-1, 1))
+            .to(device)
+        )
+
     def start(self, agent, env, storage, util_dict):
         if self.oracle_neighbor:
             self.NeighborhoodNet = util_dict["OracleNeighborhoodNet"].to(device)
@@ -81,7 +122,7 @@ class neighborhood_il:
             duplicate_expert_last_state=self.duplicate_expert_last_state,
             data_name=self.data_name,
         )
-        self.gen_reward_calc_expert_data(storage)
+        self.gen_data(storage)
         self.train(agent, env, storage)
 
     def test(self, agent, env, render_id=0):
@@ -132,8 +173,9 @@ class neighborhood_il:
                     state = next_state
         best_testing_reward = -1e7
         best_episode = 0
+        print("warmup finished")
         for episode in range(self.episodes):
-            # t=time.time()
+            # t = time.time()
             if (
                 not self.oracle_neighbor
                 and episode % self.update_neighbor_frequency == 0
@@ -149,18 +191,18 @@ class neighborhood_il:
                 state = env.reset()
             done = False
             total_reward = 0
-            # t=time.time()
+            # t = time.time()
             while not done:
                 action = agent.act(state)
                 # print(f"agent act time: {time.time()-t}")
-                # t=time.time()
+                # t = time.time()
                 next_state, reward, done, info = env.step(action)
                 # print(f"env step time: {time.time()-t}")
-                # t=time.time()
+                # t = time.time()
                 total_reward += reward
                 storage.store(state, action, reward, next_state, done)
                 # print(f"store time: {time.time()-t}")
-                # t=time.time()
+                # t = time.time()
                 state = next_state
                 # loss = self.update_neighbor_model(storage)
                 # wandb.log({"neighbor_model_loss": loss}, commit=False)
@@ -177,10 +219,10 @@ class neighborhood_il:
                     self.use_env_done,
                 )
                 # print(f"update time: {time.time()-t}")
-                # t=time.time()
+                # t = time.time()
                 wandb.log(loss_info, commit=False)
                 # print(f"log time: {time.time()-t}")
-                # t=time.time()
+                # t = time.time()
             wandb.log(
                 {
                     "training_reward": total_reward,
@@ -190,7 +232,7 @@ class neighborhood_il:
                 }
             )
             # print(f"log time: {time.time()-t}")
-            # t=time.time()
+            # t = time.time()
             if hasattr(agent, "update_epsilon"):
                 agent.update_epsilon()
 
@@ -215,7 +257,7 @@ class neighborhood_il:
                         self.oracle_neighbor,
                     )
                 # print(f"test time: {time.time()-t}")
-                # t=time.time()
+                # t = time.time()
             if episode % self.save_weight_period == 0 and not self.oracle_neighbor:
                 agent.save_weight(
                     best_testing_reward, "neighborhood_il", self.env_id, best_episode
@@ -239,69 +281,36 @@ class neighborhood_il:
             if self.auto_threshold_ratio:
                 self.policy_threshold_ratio *= self.threshold_discount_factor
 
-    def update_neighbor_model(self, storage, use_expert=False):
+    def update_neighbor_model(self, storage):
         state, action, reward, next_state, done = storage.sample(self.batch_size)
-        state = torch.FloatTensor(state).to(device)
-        next_state = torch.FloatTensor(next_state).to(device)
+        if not storage.to_tensor:
+            state = torch.FloatTensor(state)
+            next_state = torch.FloatTensor(next_state)
         next_state_shift = torch.roll(next_state, 1, 0)  # for negative samples
-        label = (
-            torch.FloatTensor(
-                np.concatenate(
-                    (
-                        np.ones(state.shape[0]),
-                        np.zeros(
-                            state.shape[0] * (2 if self.hard_negative_sampling else 1)
-                        ),
-                    )
-                )
+        """
+        TODO:concate before inference
+        """
+        posivite_data = torch.cat((state, next_state), axis=1)
+        negative_data = torch.cat((state, next_state_shift), axis=1)
+        if not self.hard_negative_sampling:
+            input_data = torch.cat((posivite_data, negative_data), axis=0)
+        else:
+            negative_hard_data = torch.cat((next_state, state), axis=1)
+            input_data = torch.cat(
+                (posivite_data, negative_data, negative_hard_data), axis=0
             )
-            .view((-1, 1))
-            .to(device)
-        )
+        input_data = input_data.to(device)
+        prediction = self.NeighborhoodNet(input_data)
 
-        posivite = self.NeighborhoodNet(torch.cat((state, next_state), axis=1))
-        negative = self.NeighborhoodNet(torch.cat((state, next_state_shift), axis=1))
-        if self.hard_negative_sampling:
-            negative_hard = self.NeighborhoodNet(torch.cat((next_state, state), axis=1))
-        loss_weight = (
-            torch.cat(
-                (
-                    torch.ones(state.shape[0]) * self.neighbor_model_alpha,
-                    torch.ones(
-                        state.shape[0] * (2 if self.hard_negative_sampling else 1)
-                    )
-                    * (1 - self.neighbor_model_alpha),
-                )
-            )
-            .view((-1, 1))
-            .to(device)
-        )
         # predict positive samples
         loss = self.neighbor_criteria(
-            torch.cat(
-                (posivite, negative, negative_hard)
-                if self.hard_negative_sampling
-                else (posivite, negative),
-                axis=0,
-            ),
-            label,
+            prediction,
+            self.update_neighor_label,
         )
-        loss = torch.mean(loss * loss_weight)
+        loss = torch.mean(loss * self.neighbor_loss_weight)
         self.NeighborhoodNet_optimizer.zero_grad()
         loss.backward()
         self.NeighborhoodNet_optimizer.step()
-        if use_expert:
-            state, action, reward, next_state, done = storage.sample(-1, expert=True)
-            state = torch.FloatTensor(state).to(device)
-            next_state = torch.FloatTensor(next_state).to(device)
-            label = torch.FloatTensor(np.ones(state.shape[0])).view((-1, 1)).to(device)
-
-            posivite = self.NeighborhoodNet(torch.cat((state, next_state), axis=1))
-            # predict positive samples
-            loss = self.neighbor_criteria(posivite, label)
-            self.NeighborhoodNet_optimizer.zero_grad()
-            loss.backward()
-            self.NeighborhoodNet_optimizer.step()
         return loss.item()
 
 

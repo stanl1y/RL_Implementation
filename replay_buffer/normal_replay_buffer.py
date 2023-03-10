@@ -1,11 +1,12 @@
 import numpy as np
 import os
 import pickle
+import torch
 
 
 class normal_replay_buffer:
     def __init__(
-        self, size, state_dim, action_dim, save_env_states=False, save_state_idx=False
+        self, size, state_dim, action_dim, save_env_states=False, save_state_idx=False, to_tensor=False
     ):
         self.size = size
         self.storage_index = 0
@@ -16,8 +17,23 @@ class normal_replay_buffer:
         self.dones = np.empty((size, 1))
         self.env_states = [] if save_env_states else None
         self.states_idx = np.empty((size, 1), dtype=int) if save_state_idx else None
+        self.to_tensor = to_tensor
+        if self.to_tensor:
+            print("Replay buffer stores tensor")
+            self.states = torch.empty((size, state_dim))
+            self.actions = torch.empty((size, action_dim))
+            self.rewards = torch.empty((size, 1))
+            self.next_states = torch.empty((size, state_dim))
+            self.dones = torch.empty((size, 1))
+
 
     def store(self, s, a, r, ss, d, env_state=None, state_idx=None):
+        if self.to_tensor:
+            s = torch.FloatTensor(s)
+            a = torch.FloatTensor(a)
+            r = torch.FloatTensor([r])
+            ss = torch.FloatTensor(ss)
+            d = torch.FloatTensor([d])
         index = self.storage_index % self.size
         self.states[index] = s
         self.actions[index] = a
@@ -79,6 +95,12 @@ class normal_replay_buffer:
     def write_storage(
         self, based_on_transition_num, expert_data_num, algo, env_id, data_name=""
     ):
+        if self.to_tensor:
+            self.states = self.states.numpy()
+            self.actions = self.actions.numpy()
+            self.rewards = self.rewards.numpy()
+            self.next_states = self.next_states.numpy()
+            self.dones = self.dones.numpy()
         if data_name != "":
             data_name = f"_{data_name}"
         path = f"./saved_expert_transition/{env_id}/{algo}/"
@@ -124,6 +146,12 @@ class normal_replay_buffer:
         self.expert_rewards = data["rewards"]
         self.expert_next_states = data["next_states"]
         self.expert_dones = data["dones"]
+        if self.to_tensor:
+            self.expert_states = torch.FloatTensor(self.expert_states)
+            self.expert_actions = torch.FloatTensor(self.expert_actions)
+            self.expert_rewards = torch.FloatTensor(self.expert_rewards)
+            self.expert_next_states = torch.FloatTensor(self.expert_next_states)
+            self.expert_dones = torch.FloatTensor(self.expert_dones)
         if "env_states" in data.keys():
             self.expert_env_states = data["env_states"]
         if duplicate_expert_last_state:

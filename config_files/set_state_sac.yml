@@ -24,6 +24,8 @@ critic_optim:
   adam
 buffer_type:
   normal
+buffer_to_tensor:
+  True
 td_length:
   1
 soft_update_target:

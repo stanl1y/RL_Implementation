@@ -24,6 +24,8 @@ critic_optim:
   adam
 buffer_type:
   normal
+buffer_to_tensor:
+  True
 td_length:
   1
 soft_update_target:
@@ -69,7 +71,7 @@ update_neighbor_frequency:
 update_neighbor_step:
   400
 update_neighbor_until:
-  700
+  500
 discretize_reward:
   False
 log_name:
@@ -79,7 +81,7 @@ duplicate_expert_last_state:
 data_name:
   ""
 policy_threshold_ratio:
-  10
+  0.005
 auto_threshold_ratio:
   False
 threshold_discount_factor:
@@ -93,4 +95,6 @@ terminate_when_unhealthy:
 use_env_done:
   False
 save_state_idx:
+  True
+soft_update_neighbor:
   True
