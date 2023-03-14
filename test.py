@@ -1,33 +1,17 @@
-# import numpy as np
-# import time
-# all_update_time = 0.
-# couter=0
-# with open("exec_time_log_cpuTensor.txt", "r") as f:
-#     for(line) in f:
-#         if ("update bc time" in line):
-#             couter+=1
-#             all_update_time += float(line.split(" ")[-1])
-# print(all_update_time/couter)
-
-import torch
-import time
-a=torch.randn(100,100)
-b=torch.randn(100,100)
-
-t=time.time()
-c=torch.cat((a,b),dim=0)
-c=c.cuda()
-print(time.time()-t)
-
-d=torch.randn(100,100)
-e=torch.randn(100,100)
-
-t=time.time()
-d=d.cuda()
-e=e.cuda()
-f=torch.cat((d,e),dim=0)
-print(time.time()-t)
-t=time.time()
-c=torch.cat((a,b),dim=0)
-c=c.cuda()
-print(time.time()-t)
+import pickle
+import os
+env_id="Humanoid-v3"
+algo="sac"
+path = f"./saved_expert_transition/{env_id}/{algo}/"
+onlyfiles = [
+                os.path.join(path, f)
+                for f in os.listdir(path)
+                if os.path.isfile(os.path.join(path, f))
+            ]
+path = onlyfiles[0]
+with open(path, "rb") as handle:
+    data = pickle.load(handle)
+rewards=0
+for r in data["rewards"]:
+    rewards+=r
+print(rewards)

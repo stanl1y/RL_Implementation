@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import os
 import imageio
 import time
+import copy
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -45,6 +46,8 @@ class neighborhood_il:
         self.render = config.render
         self.hard_negative_sampling = config.hard_negative_sampling
         self.use_env_done = config.use_env_done
+        self.use_target_neighbor = config.use_target_neighbor
+        self.tau = config.tau
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -116,6 +119,8 @@ class neighborhood_il:
             self.NeighborhoodNet_optimizer = torch.optim.Adam(
                 self.NeighborhoodNet.parameters(), lr=3e-4
             )
+        if self.use_target_neighbor:
+            self.TargetNeighborhoodNet = copy.deepcopy(self.NeighborhoodNet).to(device)
         storage.load_expert_data(
             algo=self.algo,
             env_id=self.env_id,
@@ -180,10 +185,11 @@ class neighborhood_il:
                 not self.oracle_neighbor
                 and episode % self.update_neighbor_frequency == 0
                 and episode <= self.update_neighbor_until
+                and not self.use_target_neighbor
             ):
                 for _ in range(self.update_neighbor_step):
-                    loss = self.update_neighbor_model(storage)
-                    wandb.log({"neighbor_model_loss": loss}, commit=False)
+                    neighbor_loss = self.update_neighbor_model(storage)
+                    wandb.log({"neighbor_model_loss": neighbor_loss}, commit=False)
                 # print(f"update neighbor model time: {time.time()-t}")
             if self.fix_env_random_seed:
                 state = env.reset(seed=0)
@@ -206,9 +212,13 @@ class neighborhood_il:
                 state = next_state
                 # loss = self.update_neighbor_model(storage)
                 # wandb.log({"neighbor_model_loss": loss}, commit=False)
+                if self.use_target_neighbor:
+                    neighbor_loss = self.update_neighbor_model(storage)
                 loss_info = agent.update_using_neighborhood_reward(
                     storage,
-                    self.NeighborhoodNet,
+                    self.NeighborhoodNet
+                    if not self.use_target_neighbor
+                    else self.TargetNeighborhoodNet,
                     self.expert_ns_data,
                     self.margin_value,
                     self.bc_only,
@@ -220,7 +230,6 @@ class neighborhood_il:
                 )
                 # print(f"update time: {time.time()-t}")
                 # t = time.time()
-                wandb.log(loss_info, commit=False)
                 # print(f"log time: {time.time()-t}")
                 # t = time.time()
             wandb.log(
@@ -229,6 +238,8 @@ class neighborhood_il:
                     "episode_num": episode,
                     "buffer_size": len(storage),
                     "threshold_ratio": self.policy_threshold_ratio,
+                    **loss_info,
+                    "neighbor_model_loss": neighbor_loss
                 }
             )
             # print(f"log time: {time.time()-t}")
@@ -288,7 +299,7 @@ class neighborhood_il:
             next_state = torch.FloatTensor(next_state)
         next_state_shift = torch.roll(next_state, 1, 0)  # for negative samples
         """
-        TODO:concate before inference
+        TODO:easy positive samples(itself)
         """
         posivite_data = torch.cat((state, next_state), axis=1)
         negative_data = torch.cat((state, next_state_shift), axis=1)
@@ -311,7 +322,17 @@ class neighborhood_il:
         self.NeighborhoodNet_optimizer.zero_grad()
         loss.backward()
         self.NeighborhoodNet_optimizer.step()
+        if self.use_target_neighbor:
+            self.update_target_neighbor_model()
         return loss.item()
+
+    def update_target_neighbor_model(self):
+        for target_param, param in zip(
+            self.TargetNeighborhoodNet.parameters(), self.NeighborhoodNet.parameters()
+        ):
+            target_param.data.copy_(
+                target_param.data * (1.0 - self.tau) + param.data * self.tau
+            )
 
 
 # CUDA_VISIBLE_DEVICES=0 python3 main.py --main_stage neighborhood_il --main_task neighborhood_dsac --env LunarLander-v2 --wrapper basic --episode 2000 --log_name expectile99_ac_duplicateLast_nextStateReward_disReward

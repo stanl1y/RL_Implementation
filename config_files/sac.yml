@@ -35,6 +35,8 @@ buffer_type:
   normal
 main_stage_type:
   off_policy
+buffer_to_tensor:
+  True
 buffer_warmup:
   True
 continue_training:
