@@ -229,11 +229,11 @@ class neighborhood_il:
                     self.policy_threshold_ratio,
                     self.use_env_done,
                 )
-                agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
                 # print(f"update time: {time.time()-t}")
                 # t = time.time()
                 # print(f"log time: {time.time()-t}")
                 # t = time.time()
+            agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
             wandb.log(
                 {
                     "training_reward": total_reward,
@@ -242,6 +242,7 @@ class neighborhood_il:
                     "threshold_ratio": self.policy_threshold_ratio,
                     **loss_info,
                     "neighbor_model_loss": neighbor_loss,
+                    "entropy_loss_weight": agent.entropy_loss_weight,
                 }
             )
             # print(f"log time: {time.time()-t}")
