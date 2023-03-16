@@ -64,10 +64,13 @@ def get_config():
         "--noisy_network", action="store_true", help="whether to render when testing"
     )
     parser.add_argument(
-        "--no_bc", action="store_true", help="whether to render when testing"
+        "--no_bc", action="store_true", help="don't use behavior cloning when neighborhood il"
     )
     parser.add_argument(
-        "--hard_negative_sampling", action="store_true", help="whether to render when testing"
+        "--hard_negative_sampling", action="store_true", help="use hard negative sampling in neighborhood il"
+    )
+    parser.add_argument(
+        "--entropy_loss_weight_decay_rate", type=float, help="decay rate of entropy loss weight"
     )
     parser.add_argument(
         "--log_name",

@@ -57,6 +57,7 @@ class sac(base_agent):
         self.alpha_lr = alpha_lr
         self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr)
         self.best_log_alpha_optimizer = copy.deepcopy(self.log_alpha_optimizer)
+        self.entropy_loss_weight = 1.0
         self.ounoise = (
             OUNoise(
                 action_dimension=action_dim,
@@ -122,7 +123,12 @@ class sac(base_agent):
             action, log_prob, mu = self.actor.sample(policy_state)
             q_val = [critic(policy_state, action) for critic in self.critic]
             entropy_loss = -self.alpha.detach() * log_prob
-            actor_loss = (-(torch.min(q_val[0], q_val[1]) + entropy_loss)).mean()
+            actor_loss = (
+                -(
+                    torch.min(q_val[0], q_val[1])
+                    + self.entropy_loss_weight * entropy_loss
+                )
+            ).mean()
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
@@ -274,7 +280,6 @@ class sac(base_agent):
             NeighborhoodNet, expert_ns_data, next_state, state_idx, explore_step
         )
 
-
         (
             expert_state,
             expert_action,
@@ -293,7 +298,7 @@ class sac(base_agent):
             expert_action = torch.FloatTensor(expert_action)
             expert_next_state = torch.FloatTensor(expert_next_state)
             expert_done = torch.FloatTensor(expert_done)
-        expert_state= expert_state.to(device)
+        expert_state = expert_state.to(device)
         expert_action = expert_action.to(device)
         expert_next_state = expert_next_state.to(device)
         expert_done = expert_done.to(device)
@@ -466,10 +471,10 @@ class sac(base_agent):
             action = torch.FloatTensor(action)
             next_state = torch.FloatTensor(next_state)
             done = torch.FloatTensor(done)
-        state=state.to(device)
-        action=action.to(device)
-        next_state=next_state.to(device)
-        done=done.to(device)
+        state = state.to(device)
+        action = action.to(device)
+        next_state = next_state.to(device)
+        done = done.to(device)
         # print("to tensor and device time", time.time() - t)
         # t = time.time()
         reward = self.neighborhood_reward_cuda(

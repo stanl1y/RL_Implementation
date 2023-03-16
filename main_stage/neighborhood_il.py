@@ -48,6 +48,7 @@ class neighborhood_il:
         self.use_env_done = config.use_env_done
         self.use_target_neighbor = config.use_target_neighbor
         self.tau = config.tau
+        self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -228,6 +229,7 @@ class neighborhood_il:
                     self.policy_threshold_ratio,
                     self.use_env_done,
                 )
+                agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
                 # print(f"update time: {time.time()-t}")
                 # t = time.time()
                 # print(f"log time: {time.time()-t}")

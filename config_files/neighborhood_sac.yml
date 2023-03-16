@@ -98,3 +98,5 @@ save_state_idx:
   True
 use_target_neighbor:
   True
+entropy_loss_weight_decay_rate:
+  1
