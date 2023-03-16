@@ -239,7 +239,7 @@ class neighborhood_il:
                     "buffer_size": len(storage),
                     "threshold_ratio": self.policy_threshold_ratio,
                     **loss_info,
-                    "neighbor_model_loss": neighbor_loss
+                    "neighbor_model_loss": neighbor_loss,
                 }
             )
             # print(f"log time: {time.time()-t}")
@@ -256,7 +256,11 @@ class neighborhood_il:
                     best_testing_reward = testing_reward
                     best_episode = episode
                 wandb.log(
-                    {"testing_reward": testing_reward, "testing_episode_num": episode}
+                    {
+                        "testing_reward": testing_reward,
+                        "testing_episode_num": episode,
+                        "best_testing_reward": best_testing_reward,
+                    }
                 )
                 if hasattr(env, "eval_toy_q"):
                     env.eval_toy_q(

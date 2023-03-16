@@ -14,7 +14,7 @@ class vanilla_off_policy_training_stage:
         self.save_weight_period = config.save_weight_period
         self.continue_training = config.continue_training
         self.render = config.render
-        self.delete_prev_weight=config.delete_prev_weight
+        self.delete_prev_weight = config.delete_prev_weight
         wandb.init(
             project="RL_Implementation",
             name=f"{self.algo}_{self.env_id}",
@@ -24,9 +24,9 @@ class vanilla_off_policy_training_stage:
     def test(self, agent, env, render_id=0):
         agent.eval()
         total_reward = 0
-        render=self.render and render_id%100==0
+        render = self.render and render_id % 100 == 0
         if render:
-            frame_buffer=[]
+            frame_buffer = []
             if not os.path.exists(f"./experiment_logs/{self.env_id}/{self.algo}/"):
                 os.makedirs(f"./experiment_logs/{self.env_id}/{self.algo}/")
         for i in range(3):
@@ -41,11 +41,14 @@ class vanilla_off_policy_training_stage:
                 action = agent.act(state, testing=True)
                 next_state, reward, done, info = env.step(action)
                 if render:
-                    frame_buffer.append(env.render(mode='rgb_array'))
+                    frame_buffer.append(env.render(mode="rgb_array"))
                 total_reward += reward
                 state = next_state
         if render:
-            imageio.mimsave(f'./experiment_logs/{self.env_id}/{self.algo}/{render_id}.gif', frame_buffer)
+            imageio.mimsave(
+                f"./experiment_logs/{self.env_id}/{self.algo}/{render_id}.gif",
+                frame_buffer,
+            )
         total_reward /= 3
         agent.train()
         return total_reward
@@ -58,9 +61,11 @@ class vanilla_off_policy_training_stage:
             agent.load_weight(self.env_id)
         if self.buffer_warmup:
             state = env.reset()
-            self.goal_condition=type(state)==dict
+            self.goal_condition = type(state) == dict
             done = False
-            while len(storage) < self.buffer_warmup_step//1000:# because HER buffer's len is num of rollout
+            while (
+                len(storage) < self.buffer_warmup_step // 1000
+            ):  # because HER buffer's len is num of rollout
                 action = env.action_space.sample()
                 next_state, reward, done, info = env.step(action)
                 storage.store(state, action, reward, next_state, done)
@@ -98,15 +103,27 @@ class vanilla_off_policy_training_stage:
                 }
             )
             if i % 5 == 0:
-                testing_reward = self.test(agent, env, render_id=i if self.render else None)
+                testing_reward = self.test(
+                    agent, env, render_id=i if self.render else None
+                )
                 if testing_reward > best_testing_reward:
                     agent.cache_weight()
                     best_testing_reward = testing_reward
                     best_episode = i
-                wandb.log({"testing_reward": testing_reward, "testing_episode_num": i})
+                wandb.log(
+                    {
+                        "testing_reward": testing_reward,
+                        "testing_episode_num": i,
+                        "best_testing_reward": best_testing_reward,
+                    }
+                )
             if i % self.save_weight_period == 0:
                 agent.save_weight(
-                    best_testing_reward, self.algo, self.env_id, best_episode, delete_prev_weight=self.delete_prev_weight
+                    best_testing_reward,
+                    self.algo,
+                    self.env_id,
+                    best_episode,
+                    delete_prev_weight=self.delete_prev_weight,
                 )
         agent.save_weight(best_testing_reward, self.algo, self.env_id, best_episode)
 
@@ -216,10 +233,12 @@ class her_off_policy_training_stage:
                 state = next_state
 
             # her part
-            for idx in range(len(episodic_state)-1):
-                pseudo_goals_idx = np.random.randint(low=idx,high=len(episodic_next_state), size=4)
+            for idx in range(len(episodic_state) - 1):
+                pseudo_goals_idx = np.random.randint(
+                    low=idx, high=len(episodic_next_state), size=4
+                )
                 for pseudo_goal_idx in pseudo_goals_idx:
-                    pseudo_goal=episodic_next_state[pseudo_goal_idx]["achieved_goal"]
+                    pseudo_goal = episodic_next_state[pseudo_goal_idx]["achieved_goal"]
                     state = episodic_state[idx]
                     state = np.append(
                         state["observation"],
@@ -246,12 +265,18 @@ class her_off_policy_training_stage:
             )
 
             if i % 5 == 0:
-                testing_reward = self.test(agent, env)#self.test_env
+                testing_reward = self.test(agent, env)  # self.test_env
                 if testing_reward > best_testing_reward:
                     agent.cache_weight()
                     best_testing_reward = testing_reward
                     best_episode = i
-                wandb.log({"testing_reward": testing_reward, "testing_episode_num": i})
+                wandb.log(
+                    {
+                        "testing_reward": testing_reward,
+                        "testing_episode_num": i,
+                        "best_testing_reward": best_testing_reward,
+                    }
+                )
             if i % self.save_weight_period == 0:
                 agent.save_weight(
                     best_testing_reward, self.algo + "_her", self.env_id, best_episode
