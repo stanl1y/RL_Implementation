@@ -64,6 +64,12 @@ def get_config():
         "--noisy_network", action="store_true", help="whether to render when testing"
     )
     parser.add_argument(
+        "--no_bc", action="store_true", help="whether to render when testing"
+    )
+    parser.add_argument(
+        "--hard_negative_sampling", action="store_true", help="whether to render when testing"
+    )
+    parser.add_argument(
         "--log_name",
         type=str,
         help="nane of log file",
