@@ -44,7 +44,7 @@ class neighborhood_il:
         self.threshold_discount_factor = config.threshold_discount_factor
         self.fix_env_random_seed = config.fix_env_random_seed
         self.render = config.render
-        self.hard_negative_sampling = config.hard_negative_sampling
+        self.hard_negative_sampling = not config.no_hard_negative_sampling
         self.use_env_done = config.use_env_done
         self.use_target_neighbor = config.use_target_neighbor
         self.tau = config.tau

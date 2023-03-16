@@ -11,7 +11,7 @@ wrapper_type:
 bc_only:
   False
 no_bc:
-  True
+  False
 ood:
   False
 hidden_dim:
@@ -88,8 +88,8 @@ threshold_discount_factor:
   0.995
 fix_env_random_seed:
   False
-hard_negative_sampling:
-  True
+no_hard_negative_sampling:
+  False
 terminate_when_unhealthy:
   False
 use_env_done:
