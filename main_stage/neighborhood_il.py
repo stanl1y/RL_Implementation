@@ -49,6 +49,7 @@ class neighborhood_il:
         self.use_target_neighbor = config.use_target_neighbor
         self.tau = config.tau
         self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
+        self.no_update_alpha = config.no_update_alpha
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -228,6 +229,7 @@ class neighborhood_il:
                     self.discretize_reward,
                     self.policy_threshold_ratio,
                     self.use_env_done,
+                    self.no_update_alpha,
                 )
                 # print(f"update time: {time.time()-t}")
                 # t = time.time()

@@ -70,7 +70,13 @@ def get_config():
         "--no_hard_negative_sampling", action="store_true", help="don't use hard negative sampling in neighborhood il"
     )
     parser.add_argument(
+        "--no_update_alpha", action="store_true", help="don't update sac's alpha"
+    )
+    parser.add_argument(
         "--entropy_loss_weight_decay_rate", type=float, help="decay rate of entropy loss weight"
+    )
+    parser.add_argument(
+        "--log_alpha_init", type=float, help="initial value of log_alpha"
     )
     parser.add_argument(
         "--log_name",
@@ -93,6 +99,7 @@ def get_config():
         type=str,
         help="what kind of replay buffer",
     )
+
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 

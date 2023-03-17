@@ -110,7 +110,7 @@ class sac(base_agent):
             "critic1_loss": critic_loss[1],
         }
 
-    def update_actor(self, state, reward=None, threshold=None):
+    def update_actor(self, state, reward=None, threshold=None, no_update_alpha=False):
         if threshold != None:
             state_idx = torch.argwhere(reward.reshape(-1) < threshold).reshape(-1)
             policy_state = state[state_idx]
@@ -132,14 +132,14 @@ class sac(base_agent):
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
-
-            """update alpha"""
-            alpha_loss = (
-                self.alpha * (-log_prob - self.target_entropy).detach()
-            ).mean()
-            self.log_alpha_optimizer.zero_grad()
-            alpha_loss.backward()
-            self.log_alpha_optimizer.step()
+            if not no_update_alpha:
+                """update alpha"""
+                alpha_loss = (
+                    self.alpha * (-log_prob - self.target_entropy).detach()
+                ).mean()
+                self.log_alpha_optimizer.zero_grad()
+                alpha_loss.backward()
+                self.log_alpha_optimizer.step()
         return {
             "actor_loss": actor_loss,
             "alpha_loss": alpha_loss,
@@ -459,6 +459,7 @@ class sac(base_agent):
         discretize_reward=False,
         policy_threshold_ratio=0.5,
         use_env_done=False,
+        no_update_alpha = False,
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -522,6 +523,7 @@ class sac(base_agent):
                 state,
                 reward=reward,
                 threshold=expert_reward_mean * policy_threshold_ratio,
+                no_update_alpha = no_update_alpha,
             )
         # print("update actor time", time.time() - t)
         # t = time.time()
