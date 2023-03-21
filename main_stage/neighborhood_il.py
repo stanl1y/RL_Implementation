@@ -182,7 +182,6 @@ class neighborhood_il:
         best_episode = 0
         print("warmup finished")
         for episode in range(self.episodes):
-            # t = time.time()
             if (
                 not self.oracle_neighbor
                 and episode % self.update_neighbor_frequency == 0
@@ -192,28 +191,18 @@ class neighborhood_il:
                 for _ in range(self.update_neighbor_step):
                     neighbor_loss = self.update_neighbor_model(storage)
                     wandb.log({"neighbor_model_loss": neighbor_loss}, commit=False)
-                # print(f"update neighbor model time: {time.time()-t}")
             if self.fix_env_random_seed:
                 state = env.reset(seed=0)
             else:
                 state = env.reset()
             done = False
             total_reward = 0
-            # t = time.time()
             while not done:
                 action = agent.act(state)
-                # print(f"agent act time: {time.time()-t}")
-                # t = time.time()
                 next_state, reward, done, info = env.step(action)
-                # print(f"env step time: {time.time()-t}")
-                # t = time.time()
                 total_reward += reward
                 storage.store(state, action, reward, next_state, done)
-                # print(f"store time: {time.time()-t}")
-                # t = time.time()
                 state = next_state
-                # loss = self.update_neighbor_model(storage)
-                # wandb.log({"neighbor_model_loss": loss}, commit=False)
                 if self.use_target_neighbor:
                     neighbor_loss = self.update_neighbor_model(storage)
                 loss_info = agent.update_using_neighborhood_reward(
@@ -231,10 +220,6 @@ class neighborhood_il:
                     self.use_env_done,
                     self.no_update_alpha,
                 )
-                # print(f"update time: {time.time()-t}")
-                # t = time.time()
-                # print(f"log time: {time.time()-t}")
-                # t = time.time()
             agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
             wandb.log(
                 {
@@ -247,8 +232,6 @@ class neighborhood_il:
                     "entropy_loss_weight": agent.entropy_loss_weight,
                 }
             )
-            # print(f"log time: {time.time()-t}")
-            # t = time.time()
             if hasattr(agent, "update_epsilon"):
                 agent.update_epsilon()
 
@@ -276,8 +259,6 @@ class neighborhood_il:
                         episode,
                         self.oracle_neighbor,
                     )
-                # print(f"test time: {time.time()-t}")
-                # t = time.time()
             if episode % self.save_weight_period == 0 and not self.oracle_neighbor:
                 agent.save_weight(
                     best_testing_reward, "neighborhood_il", self.env_id, best_episode

@@ -25,7 +25,7 @@ critic_optim:
 buffer_type:
   normal
 buffer_to_tensor:
-  True
+  False
 td_length:
   1
 soft_update_target:
@@ -88,13 +88,19 @@ threshold_discount_factor:
   0.995
 fix_env_random_seed:
   False
-hard_negative_sampling:
-  True
+no_hard_negative_sampling:
+  False
 terminate_when_unhealthy:
   False
 explore_step:
-  5
+  10
 use_env_done:
   False
 save_state_idx:
   True
+use_target_neighbor:
+  True
+entropy_loss_weight_decay_rate:
+  1
+no_update_alpha:
+  False

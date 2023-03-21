@@ -43,9 +43,13 @@ class set_state_il:
         self.threshold_discount_factor = config.threshold_discount_factor
         self.fix_env_random_seed = config.fix_env_random_seed
         self.render = config.render
-        self.hard_negative_sampling = config.hard_negative_sampling
+        self.hard_negative_sampling = not config.no_hard_negative_sampling
         self.explore_step = config.explore_step
         self.use_env_done = config.use_env_done
+        self.use_target_neighbor = config.use_target_neighbor
+        self.tau = config.tau
+        self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
+        self.no_update_alpha = config.no_update_alpha
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -82,6 +86,8 @@ class set_state_il:
             self.NeighborhoodNet_optimizer = torch.optim.Adam(
                 self.NeighborhoodNet.parameters(), lr=3e-4
             )
+        if self.use_target_neighbor:
+            self.TargetNeighborhoodNet = copy.deepcopy(self.NeighborhoodNet).to(device)
         storage.load_expert_data(
             algo=self.algo,
             env_id=self.env_id,
@@ -137,6 +143,7 @@ class set_state_il:
                         return_expert_env_states=True,
                         exclude_tail_num=self.explore_step - 1,
                     )
+                    idx = idx.item()
                 if self.fix_env_random_seed:
                     _ = env.reset(seed=0)
                 else:
@@ -146,9 +153,7 @@ class set_state_il:
                 for _ in range(self.explore_step):
                     action = env.action_space.sample()
                     next_obs, reward, done, info = env.step(action)
-                    storage.store(
-                        obs, action, reward, next_obs, done, state_idx=idx.item()
-                    )
+                    storage.store(obs, action, reward, next_obs, done, state_idx=idx)
                     obs = next_obs
                     if done:
                         break
@@ -159,39 +164,47 @@ class set_state_il:
                 not self.oracle_neighbor
                 and episode % self.update_neighbor_frequency == 0
                 and episode <= self.update_neighbor_until
+                and not self.use_target_neighbor
             ):
                 for _ in range(self.update_neighbor_step):
                     loss = self.update_neighbor_model(storage)
                     wandb.log({"neighbor_model_loss": loss}, commit=False)
             done = True
-            while done:
-                # to avoid we sample the last expert state (terminated because time horizon) as the first state
-                obs, _, _, _, done, expert_env_state, idx = storage.sample(
-                    batch_size=1,
-                    expert=True,
-                    return_idx=True,
-                    return_expert_env_states=True,
-                    exclude_tail_num=self.explore_step - 1,
-                )
-                obs = obs[0]
             if self.fix_env_random_seed:
-                _ = env.reset(seed=0)
+                obs = env.reset(seed=0)
             else:
-                _ = env.reset()
-            env.sim.set_state(expert_env_state)
-            env.sim.forward()
+                obs = env.reset()
+            if np.random.rand() > 0.01:  # sample initial state from expert data
+                while done:
+                    # to avoid we sample the last expert state (terminated because time horizon) as the first state
+                    obs, _, _, _, done, expert_env_state, idx = storage.sample(
+                        batch_size=1,
+                        expert=True,
+                        return_idx=True,
+                        return_expert_env_states=True,
+                        exclude_tail_num=self.explore_step - 1,
+                    )
+                    obs = obs[0]
+                    env.sim.set_state(expert_env_state)
+                    env.sim.forward()
+                    idx = idx.item()
+            else:
+                done = False
+                idx = 0
             total_reward = 0
             for _ in range(self.explore_step):
                 action = agent.act(obs)
                 next_obs, reward, done, info = env.step(action)
                 total_reward += reward
-                storage.store(obs, action, reward, next_obs, done, state_idx=idx.item())
+                storage.store(obs, action, reward, next_obs, done, state_idx=idx)
                 obs = next_obs
-                # loss = self.update_neighbor_model(storage)
-                # wandb.log({"neighbor_model_loss": loss}, commit=False)
+                if self.use_target_neighbor:
+                    neighbor_loss = self.update_neighbor_model(storage)
                 loss_info = agent.update_using_set_state_neighborhood_reward(
                     storage,
-                    self.NeighborhoodNet,
+                    self.NeighborhoodNet
+                    if not self.use_target_neighbor
+                    else self.TargetNeighborhoodNet,
                     self.expert_ns_data,
                     self.explore_step,
                     self.bc_only,
@@ -199,6 +212,7 @@ class set_state_il:
                     self.oracle_neighbor,
                     self.policy_threshold_ratio,
                     self.use_env_done,
+                    self.no_update_alpha,
                 )
                 wandb.log(loss_info, commit=False)
                 if done:
@@ -308,19 +322,17 @@ class set_state_il:
         self.NeighborhoodNet_optimizer.zero_grad()
         loss.backward()
         self.NeighborhoodNet_optimizer.step()
-        if use_expert:
-            state, action, reward, next_state, done = storage.sample(-1, expert=True)
-            state = torch.FloatTensor(state).to(device)
-            next_state = torch.FloatTensor(next_state).to(device)
-            label = torch.FloatTensor(np.ones(state.shape[0])).view((-1, 1)).to(device)
-
-            posivite = self.NeighborhoodNet(torch.cat((state, next_state), axis=1))
-            # predict positive samples
-            loss = self.neighbor_criteria(posivite, label)
-            self.NeighborhoodNet_optimizer.zero_grad()
-            loss.backward()
-            self.NeighborhoodNet_optimizer.step()
+        if self.use_target_neighbor:
+            self.update_target_neighbor_model()
         return loss.item()
+
+    def update_target_neighbor_model(self):
+        for target_param, param in zip(
+            self.TargetNeighborhoodNet.parameters(), self.NeighborhoodNet.parameters()
+        ):
+            target_param.data.copy_(
+                target_param.data * (1.0 - self.tau) + param.data * self.tau
+            )
 
 
 # CUDA_VISIBLE_DEVICES=0 python3 main.py --main_stage neighborhood_il --main_task neighborhood_dsac --env LunarLander-v2 --wrapper basic --episode 2000 --log_name expectile99_ac_duplicateLast_nextStateReward_disReward

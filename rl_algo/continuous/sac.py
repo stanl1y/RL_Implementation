@@ -216,8 +216,8 @@ class sac(base_agent):
         with torch.no_grad():
             prob = NeighborhoodNet(cartesian_product_state)
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
-            reward = prob.reshape((len(next_state), -1))
-            reward, _ = torch.max(reward, dim=1, keepdim=True)
+            reward = prob.reshape((len(next_state), -1)).sum(axis=1, keepdims=True)
+            # reward, _ = torch.max(reward, dim=1, keepdim=True)
         return reward
 
     def set_state_neighborhood_reward(
@@ -246,8 +246,8 @@ class sac(base_agent):
         with torch.no_grad():
             prob = NeighborhoodNet(cartesian_product_state)
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
-            reward = prob.reshape((len(next_state), -1))
-            reward, _ = torch.max(reward, dim=1, keepdim=True)
+            reward = prob.reshape((len(next_state), -1)).sum(axis=1, keepdims=True)
+            # reward, _ = torch.max(reward, dim=1, keepdim=True)
         return reward
 
     def update_using_set_state_neighborhood_reward(
@@ -261,6 +261,7 @@ class sac(base_agent):
         oracle_neighbor=False,
         policy_threshold_ratio=0.5,
         use_env_done=False,
+        no_update_alpha=False,
     ):
         """sample agent data"""
         state, action, _, next_state, done, state_idx = storage.sample(
@@ -320,6 +321,7 @@ class sac(base_agent):
                 state,
                 reward=reward,
                 threshold=expert_reward_mean * policy_threshold_ratio,
+                no_update_alpha=no_update_alpha,
             )
         critic_loss = self.update_critic(
             state,
@@ -459,7 +461,7 @@ class sac(base_agent):
         discretize_reward=False,
         policy_threshold_ratio=0.5,
         use_env_done=False,
-        no_update_alpha = False,
+        no_update_alpha=False,
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -523,7 +525,7 @@ class sac(base_agent):
                 state,
                 reward=reward,
                 threshold=expert_reward_mean * policy_threshold_ratio,
-                no_update_alpha = no_update_alpha,
+                no_update_alpha=no_update_alpha,
             )
         # print("update actor time", time.time() - t)
         # t = time.time()
