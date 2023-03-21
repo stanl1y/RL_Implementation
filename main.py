@@ -99,6 +99,9 @@ def get_config():
         type=str,
         help="what kind of replay buffer",
     )
+    parser.add_argument(
+        "--explore_step", type=int, help="number of step of exploration in set_state_il"
+    )
 
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
