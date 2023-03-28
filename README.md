@@ -9,20 +9,7 @@
     <img src="images/logo.svg" alt="Logo" width="800" height="800">
   </a>
 
-<h3 align="center">RL_Implementation</h3>
-
-  <p align="center">
-    This is a project that implements some rl algorithm.
-    <!-- <br />
-    <a href="https://github.com/github_username/repo_name"><strong>Explore the docs »</strong></a>
-    <br />
-    <br />
-    <a href="https://github.com/github_username/repo_name">View Demo</a>
-    ·
-    <a href="https://github.com/github_username/repo_name/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/github_username/repo_name/issues">Request Feature</a> -->
-  </p>
+<h3 align="center">neighborhood IL</h3>
 </div>
 
 
@@ -59,7 +46,7 @@
 ## About The Project
 
 <!-- [![Product Name Screen Shot][product-screenshot]](https://example.com) -->
-This is a RL framework that aims to improve the development speed of RL algorithms. Each component of a RL algorithm is seperated clearly by different module so as to achive high maintainability and flexibility.
+This project is built based on RL_Implementation project, which is a RL framework I built. This project aims to design an imitation learning algorithm that can let the agent achieve expert performance with only one demonstration.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -155,22 +142,34 @@ just like all the blocks are assembled
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 
+## Scripts
+### Train normal agent (expert)
+```
+python3 main.py --main_task sac --env HalfCheetah-v3 --episodes 20000 --batch_size 256
+```
+### Collect expert data
+```
+python3 main.py --main_stage collect_expert --main_task sac --env Humanoid-v3 --expert_episode_num 1 --weight_path ./trained_model/sac/Humanoid-v3/episode13425_reward6505.137.pt --save_env_states
+```
+### Normal neighborhood IL
+```
+python3 main.py --main_stage neighborhood_il --main_task neighborhood_sac --env <YOUR ENV> --wrapper basic --episode 20000 --data_name <EXPERT DATA PATH> --log_name <NAME OF THIS RUN>
+```
+ex.
+```
+python3 main.py --main_stage neighborhood_il --main_task neighborhood_sac --env Ant-v3 --wrapper basic --episode 20000 --data_name sac/episode_num1_8524 --log_name noOOD_threshold10_hardneg_expert8524_targetNeighbor
+```
+### Run neighborhood IL without BC loss
+```
+add
+--no_bc
+```
+### Run neighborhood IL without hard negative sampling
+```
+add
+--no_hard_negative_sampling
+```
 
-<!-- ROADMAP -->
-## TODO
-
-- [ ] discrete sac
-- [ ] ppo
-- [ ] rainbow
-    - [ ] double
-    - [ ] dueling
-    - [ ] PER
-    - [ ] noisynet
-    - [ ] n-step TD
-    - [ ] distributional
-- [ ] some imitaion learning algo
-- [ ] distributed RL
-<!-- See the [open issues](https://github.com/github_username/repo_name/issues) for a full list of proposed features (and known issues). -->
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
