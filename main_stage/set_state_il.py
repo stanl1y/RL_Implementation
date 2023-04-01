@@ -70,8 +70,8 @@ class set_state_il:
         self.expert_ns_data = np.lib.stride_tricks.as_strided(
             expert_next_states,
             shape=(
-                len(expert_next_states) - self.explore_step ,
-                self.explore_step+1,
+                len(expert_next_states) - (self.explore_step - 1),
+                self.explore_step + 1,
                 expert_next_states.shape[-1],
             ),
             strides=(strides[0], strides[0], strides[1]),
@@ -174,7 +174,7 @@ class set_state_il:
                 obs = env.reset(seed=0)
             else:
                 obs = env.reset()
-            if np.random.rand() > 0.01:  # sample initial state from expert data
+            if np.random.rand() > 0.1:  # sample initial state from expert data
                 while done:
                     # to avoid we sample the last expert state (terminated because time horizon) as the first state
                     obs, _, _, _, done, expert_env_state, idx = storage.sample(
