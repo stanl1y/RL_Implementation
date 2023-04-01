@@ -63,7 +63,7 @@ class set_state_il:
             config=config,
         )
 
-    def gen_reward_cailc_expert_data(self, storage):
+    def gen_reward_calc_expert_data(self, storage):
         expert_next_states = copy.deepcopy(storage.expert_next_states)
         strides = expert_next_states.strides
         # https://tinyurl.com/2zgc7mcb
