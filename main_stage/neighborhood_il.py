@@ -190,7 +190,7 @@ class neighborhood_il:
             ):
                 for _ in range(self.update_neighbor_step):
                     neighbor_loss = self.update_neighbor_model(storage)
-                    wandb.log({"neighbor_model_loss": neighbor_loss}, commit=False)
+                wandb.log({"neighbor_model_loss": neighbor_loss}, commit=False)
             if self.fix_env_random_seed:
                 state = env.reset(seed=0)
             else:

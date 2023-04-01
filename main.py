@@ -46,6 +46,9 @@ def get_config():
         "--continue_training", action="store_true", help="use ou noise or not"
     )
     parser.add_argument(
+        "--ood", action="store_true", help="Out of distribution evaluation"
+    )
+    parser.add_argument(
         "--expert_transition_num", type=int, help="number of expert data"
     )
     parser.add_argument(

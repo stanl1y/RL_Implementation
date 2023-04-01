@@ -50,7 +50,7 @@ class evaluate:
                     total_reward += reward
                     if render:
                         frame_buffer.append(env.render(mode="rgb_array"))
-                for _ in range(20):
+                for _ in range(10):
                     state, reward, done, info = env.step(
                         env.action_space.sample()
                     )

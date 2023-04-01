@@ -207,7 +207,7 @@ class sac(base_agent):
 
         cartesian_product_state = torch.cat(
             (
-                torch.repeat_interleave(next_state, explore_step, dim=0),
+                torch.repeat_interleave(next_state, explore_step+1, dim=0),
                 expert_ns_data[state_idx].reshape((-1, expert_ns_data.shape[-1])),
             ),
             dim=1,

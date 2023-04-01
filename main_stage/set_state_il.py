@@ -63,15 +63,15 @@ class set_state_il:
             config=config,
         )
 
-    def gen_reward_calc_expert_data(self, storage):
+    def gen_reward_cailc_expert_data(self, storage):
         expert_next_states = copy.deepcopy(storage.expert_next_states)
         strides = expert_next_states.strides
         # https://tinyurl.com/2zgc7mcb
         self.expert_ns_data = np.lib.stride_tricks.as_strided(
             expert_next_states,
             shape=(
-                len(expert_next_states) - (self.explore_step - 1),
-                self.explore_step,
+                len(expert_next_states) - self.explore_step ,
+                self.explore_step+1,
                 expert_next_states.shape[-1],
             ),
             strides=(strides[0], strides[0], strides[1]),
@@ -168,7 +168,7 @@ class set_state_il:
             ):
                 for _ in range(self.update_neighbor_step):
                     loss = self.update_neighbor_model(storage)
-                    wandb.log({"neighbor_model_loss": loss}, commit=False)
+                wandb.log({"neighbor_model_loss": loss}, commit=False)
             done = True
             if self.fix_env_random_seed:
                 obs = env.reset(seed=0)
@@ -214,7 +214,6 @@ class set_state_il:
                     self.use_env_done,
                     self.no_update_alpha,
                 )
-                wandb.log(loss_info, commit=False)
                 if done:
                     break
             wandb.log(
@@ -223,6 +222,8 @@ class set_state_il:
                     "episode_num": episode,
                     "buffer_size": len(storage),
                     "threshold_ratio": self.policy_threshold_ratio,
+                    **loss_info,
+                    "neighbor_model_loss": neighbor_loss,
                 }
             )
             if hasattr(agent, "update_epsilon"):
