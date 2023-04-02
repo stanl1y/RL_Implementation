@@ -59,7 +59,7 @@ class set_state_il:
 
         wandb.init(
             project="Neighborhood",
-            name=f"set_state_{self.env_id}{self.log_name}",
+            name=f"set_state_{self.env_id}{self.log_name}_explore{self.explore_step}",
             config=config,
         )
 
