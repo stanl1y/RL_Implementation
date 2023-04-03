@@ -76,6 +76,9 @@ def get_config():
         "--no_update_alpha", action="store_true", help="don't update sac's alpha"
     )
     parser.add_argument(
+        "--terminate_when_unhealthy", action="store_true", help="terminate when unhealthy"
+    )
+    parser.add_argument(
         "--entropy_loss_weight_decay_rate", type=float, help="decay rate of entropy loss weight"
     )
     parser.add_argument(
