@@ -238,7 +238,11 @@ class set_state_il:
                     best_testing_reward = testing_reward
                     best_episode = episode
                 wandb.log(
-                    {"testing_reward": testing_reward, "testing_episode_num": episode}
+                    {
+                        "testing_reward": testing_reward,
+                        "testing_episode_num": episode,
+                        "best_testing_reward": best_testing_reward,
+                    }
                 )
                 if hasattr(env, "eval_toy_q"):
                     env.eval_toy_q(
