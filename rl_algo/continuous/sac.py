@@ -216,8 +216,8 @@ class sac(base_agent):
         with torch.no_grad():
             prob = NeighborhoodNet(cartesian_product_state)
             # prob is in the shape of (len(next_state)*len(expert_state), 1)
-            reward = prob.reshape((len(next_state), -1)).sum(axis=1, keepdims=True)
-            # reward, _ = torch.max(reward, dim=1, keepdim=True)
+            reward = prob.reshape((len(next_state), -1))#.sum(axis=1, keepdims=True)
+            reward, _ = torch.max(reward, dim=1, keepdim=True)
         return reward
 
     def set_state_neighborhood_reward(
