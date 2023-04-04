@@ -104,3 +104,7 @@ entropy_loss_weight_decay_rate:
   1
 no_update_alpha:
   False
+easy_nagative_weight_decay:
+  False
+easy_nagative_weight_decay_rate:
+  0.999

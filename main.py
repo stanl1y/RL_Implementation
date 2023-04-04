@@ -73,6 +73,9 @@ def get_config():
         "--no_hard_negative_sampling", action="store_true", help="don't use hard negative sampling in neighborhood il"
     )
     parser.add_argument(
+        "--easy_nagative_weight_decay", action="store_true", help="decay the weight of easy negative samples"
+    )
+    parser.add_argument(
         "--no_update_alpha", action="store_true", help="don't update sac's alpha"
     )
     parser.add_argument(

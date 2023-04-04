@@ -50,6 +50,9 @@ class set_state_il:
         self.tau = config.tau
         self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
         self.no_update_alpha = config.no_update_alpha
+        self.easy_nagative_weight = 1
+        self.easy_nagative_weight_decay_rate = config.easy_nagative_weight_decay_rate
+        self.easy_nagative_weight_decay = config.easy_nagative_weight_decay
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -224,6 +227,7 @@ class set_state_il:
                     "threshold_ratio": self.policy_threshold_ratio,
                     **loss_info,
                     "neighbor_model_loss": neighbor_loss,
+                    "easy_nagative_weight" : self.easy_nagative_weight,
                 }
             )
             if hasattr(agent, "update_epsilon"):
@@ -266,7 +270,9 @@ class set_state_il:
                     "neighborhood_optimizer_state_dict": self.NeighborhoodNet_optimizer.state_dict(),
                 }
 
-                file_path = os.path.join(path, f"set_state_episode{episode}_{self.log_name}.pt")
+                file_path = os.path.join(
+                    path, f"set_state_episode{episode}_{self.log_name}.pt"
+                )
                 torch.save(data, file_path)
                 try:
                     os.remove(self.previous_checkpoint_path)
@@ -275,6 +281,8 @@ class set_state_il:
                 self.previous_checkpoint_path = file_path
             if self.auto_threshold_ratio:
                 self.policy_threshold_ratio *= self.threshold_discount_factor
+            if self.easy_nagative_weight_decay:
+                self.easy_nagative_weight *= self.easy_nagative_weight_decay_rate
 
     def update_neighbor_model(self, storage, use_expert=False):
         state, action, reward, next_state, done = storage.sample(self.batch_size)
@@ -300,19 +308,30 @@ class set_state_il:
         negative = self.NeighborhoodNet(torch.cat((state, next_state_shift), axis=1))
         if self.hard_negative_sampling:
             negative_hard = self.NeighborhoodNet(torch.cat((next_state, state), axis=1))
-        loss_weight = (
-            torch.cat(
-                (
-                    torch.ones(state.shape[0]) * self.neighbor_model_alpha,
-                    torch.ones(
-                        state.shape[0] * (2 if self.hard_negative_sampling else 1)
+            loss_weight = (
+                torch.cat(
+                    (
+                        torch.ones(state.shape[0]) * self.neighbor_model_alpha,
+                        torch.ones(state.shape[0])
+                        * (1 - self.neighbor_model_alpha)
+                        * self.easy_nagative_weight,
+                        torch.ones(state.shape[0]),
                     )
-                    * (1 - self.neighbor_model_alpha),
                 )
+                .view((-1, 1))
+                .to(device)
             )
-            .view((-1, 1))
-            .to(device)
-        )
+        else:
+            loss_weight = (
+                torch.cat(
+                    (
+                        torch.ones(state.shape[0]) * self.neighbor_model_alpha,
+                        torch.ones(state.shape[0]) * (1 - self.neighbor_model_alpha),
+                    )
+                )
+                .view((-1, 1))
+                .to(device)
+            )
         # predict positive samples
         loss = self.neighbor_criteria(
             torch.cat(
