@@ -45,11 +45,12 @@ class neighborhood_il_hybrid:
         self.fix_env_random_seed = config.fix_env_random_seed
         self.render = config.render
         self.hard_negative_sampling = not config.no_hard_negative_sampling
+        self.explore_step = config.explore_step
         self.use_env_done = config.use_env_done
         self.use_target_neighbor = config.use_target_neighbor
         self.tau = config.tau
-        self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
         self.no_update_alpha = config.no_update_alpha
+        self.total_steps = 0
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -63,7 +64,7 @@ class neighborhood_il_hybrid:
             self.margin_value = 0.1
         wandb.init(
             project="Neighborhood",
-            name=f"{self.env_id}{self.log_name}",
+            name=f"hybrid_{self.env_id}{self.log_name}_explore{self.explore_step}",
             config=config,
         )
 
@@ -113,21 +114,6 @@ class neighborhood_il_hybrid:
             .to(device)
         )
 
-    def gen_set_state_reward_calc_expert_data(self, storage):
-        expert_next_states = copy.deepcopy(storage.expert_next_states)
-        strides = expert_next_states.strides
-        # https://tinyurl.com/2zgc7mcb
-        self.set_state_expert_ns_data = np.lib.stride_tricks.as_strided(
-            expert_next_states,
-            shape=(
-                len(expert_next_states) - (self.explore_step - 1),
-                self.explore_step + 1,
-                expert_next_states.shape[-1],
-            ),
-            strides=(strides[0], strides[0], strides[1]),
-        )
-        self.set_state_expert_ns_data = torch.FloatTensor(self.expert_ns_data).to(device)
-
     def start(self, agent, env, storage, util_dict):
         if self.oracle_neighbor:
             self.NeighborhoodNet = util_dict["OracleNeighborhoodNet"].to(device)
@@ -145,7 +131,6 @@ class neighborhood_il_hybrid:
             data_name=self.data_name,
         )
         self.gen_reward_calc_expert_data(storage)
-        self.gen_set_state_reward_calc_expert_data(storage)
         self.train(agent, env, storage)
 
     def test(self, agent, env, render_id=0):
@@ -236,7 +221,45 @@ class neighborhood_il_hybrid:
                     self.use_env_done,
                     self.no_update_alpha,
                 )
-            agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
+                self.total_steps += 1
+            for _ in range(5):
+                obs, _, _, _, done, expert_env_state, idx = storage.sample(
+                    batch_size=1,
+                    expert=True,
+                    return_idx=True,
+                    return_expert_env_states=True,
+                    exclude_tail_num=self.explore_step - 1,
+                )
+                obs = obs[0]
+                env.reset()
+                env.sim.set_state(expert_env_state)
+                env.sim.forward()
+                for _ in range(self.explore_step):
+                    action = agent.act(obs)
+                    next_obs, reward, done, info = env.step(action)
+                    storage.store(obs, action, reward, next_obs, done)
+                    obs = next_obs
+                    if self.use_target_neighbor:
+                        neighbor_loss = self.update_neighbor_model(storage)
+                    loss_info = agent.update_using_neighborhood_reward(
+                        storage,
+                        self.NeighborhoodNet
+                        if not self.use_target_neighbor
+                        else self.TargetNeighborhoodNet,
+                        self.expert_ns_data,
+                        self.margin_value,
+                        self.bc_only,
+                        self.no_bc,
+                        self.oracle_neighbor,
+                        self.discretize_reward,
+                        self.policy_threshold_ratio,
+                        self.use_env_done,
+                        self.no_update_alpha,
+                    )
+                    self.total_steps += 1
+                    if done:
+                        break
+
             wandb.log(
                 {
                     "training_reward": total_reward,
@@ -245,7 +268,7 @@ class neighborhood_il_hybrid:
                     "threshold_ratio": self.policy_threshold_ratio,
                     **loss_info,
                     "neighbor_model_loss": neighbor_loss,
-                    "entropy_loss_weight": agent.entropy_loss_weight,
+                    "total_steps": self.total_steps,
                 }
             )
             if hasattr(agent, "update_epsilon"):
@@ -288,7 +311,7 @@ class neighborhood_il_hybrid:
                     "neighborhood_optimizer_state_dict": self.NeighborhoodNet_optimizer.state_dict(),
                 }
 
-                file_path = os.path.join(path, f"episode{episode}_{self.log_name}.pt")
+                file_path = os.path.join(path, f"hybrid_episode{episode}_{self.log_name}.pt")
                 torch.save(data, file_path)
                 try:
                     os.remove(self.previous_checkpoint_path)

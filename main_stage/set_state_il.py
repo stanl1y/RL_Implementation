@@ -266,7 +266,7 @@ class set_state_il:
                     "neighborhood_optimizer_state_dict": self.NeighborhoodNet_optimizer.state_dict(),
                 }
 
-                file_path = os.path.join(path, f"episode{episode}.pt")
+                file_path = os.path.join(path, f"set_state_episode{episode}_{self.log_name}.pt")
                 torch.save(data, file_path)
                 try:
                     os.remove(self.previous_checkpoint_path)
