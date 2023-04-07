@@ -20,7 +20,7 @@ class evaluate:
             if self.perturb_from_mid:
                 log_name += "_perturb_from_mid"
             log_name += f"{self.perturb_step_num}"
-
+        log_name+=(f"weight{self.weight_path.split('_')[-1]}")
         wandb.init(
             project="RL_Implementation",
             name=log_name,
