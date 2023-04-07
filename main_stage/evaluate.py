@@ -11,10 +11,19 @@ class evaluate:
         self.env_id = config.env
         self.render = config.render
         self.ood = config.ood
+        self.perturb_from_mid = config.perturb_from_mid
         self.weight_path = config.weight_path
+        self.perturb_step_num = config.perturb_step_num
+        log_name = f"{self.algo}_{self.env_id}_eval"
+        if self.ood:
+            log_name += "_ood"
+            if self.perturb_from_mid:
+                log_name += "_perturb_from_mid"
+            log_name += f"{self.perturb_step_num}"
+
         wandb.init(
             project="RL_Implementation",
-            name=f"{self.algo}_{self.env_id}_eval" + ("_ood" if self.ood else ""),
+            name=log_name,
             config=config,
         )
 
@@ -43,18 +52,19 @@ class evaluate:
             done = False
             total_reward = 0
             if self.ood:
-                for _ in range(500):
-                    state, reward, done, info = env.step(
-                        action = agent.act(state, testing=True)
-                    )  # env.action_space.sample()
+                if self.perturb_from_mid:
+                    for _ in range(500):
+                        state, reward, done, info = env.step(
+                            action=agent.act(state, testing=True)
+                        )  # env.action_space.sample()
+                        total_reward += reward
+                        if render:
+                            frame_buffer.append(env.render(mode="rgb_array"))
+                for _ in range(self.perturb_step_num):
+                    state, reward, done, info = env.step(env.action_space.sample())
                     total_reward += reward
                     if render:
                         frame_buffer.append(env.render(mode="rgb_array"))
-                for _ in range(10):
-                    state, reward, done, info = env.step(
-                        env.action_space.sample()
-                    )
-                    total_reward += reward
             while not done:
                 action = agent.act(state, testing=True)
                 next_state, reward, done, info = env.step(action)
@@ -62,7 +72,6 @@ class evaluate:
                     frame_buffer.append(env.render(mode="rgb_array"))
                 total_reward += reward
                 state = next_state
-
 
             # if self.ood:
             #     for _ in range(10):
@@ -84,7 +93,7 @@ class evaluate:
                     f"{save_dir}{i}.gif",
                     frame_buffer,
                 )
-                frame_buffer=[]
+                frame_buffer = []
             wandb.log(
                 {
                     "testing_reward": total_reward,

@@ -50,6 +50,7 @@ class neighborhood_il:
         self.tau = config.tau
         self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
         self.no_update_alpha = config.no_update_alpha
+        self.infinite_neighbor_buffer = config.infinite_neighbor_buffer
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -283,7 +284,9 @@ class neighborhood_il:
                 self.policy_threshold_ratio *= self.threshold_discount_factor
 
     def update_neighbor_model(self, storage):
-        state, action, reward, next_state, done = storage.sample(self.batch_size)
+        state, action, reward, next_state, done = storage.sample(
+            self.batch_size, only_last_1m=not self.infinite_neighbor_buffer
+        )
         if not storage.to_tensor:
             state = torch.FloatTensor(state)
             next_state = torch.FloatTensor(next_state)

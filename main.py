@@ -49,10 +49,18 @@ def get_config():
         "--ood", action="store_true", help="Out of distribution evaluation"
     )
     parser.add_argument(
+        "--perturb_from_mid", action="store_true", default=False, help="When eval in ood mode, perturb from mid"
+    )
+    parser.add_argument(
+        "--perturb_step_num", type=int, default=10, help="number of perturb step"
+    )
+    parser.add_argument(
         "--expert_transition_num", type=int, help="number of expert data"
     )
     parser.add_argument(
-        "--save_env_states", action="store_true", help="store the env state for 'set_state' or not"
+        "--save_env_states",
+        action="store_true",
+        help="store the env state for 'set_state' or not",
     )
     parser.add_argument("--expert_episode_num", type=int, help="number of expert data")
     parser.add_argument(
@@ -66,23 +74,34 @@ def get_config():
     parser.add_argument(
         "--noisy_network", action="store_true", help="whether to render when testing"
     )
+    parser.add_argument("--infinite_neighbor_buffer", action="store_true")
     parser.add_argument(
-        "--no_bc", action="store_true", help="don't use behavior cloning when neighborhood il"
+        "--no_bc",
+        action="store_true",
+        help="don't use behavior cloning when neighborhood il",
     )
     parser.add_argument(
-        "--no_hard_negative_sampling", action="store_true", help="don't use hard negative sampling in neighborhood il"
+        "--no_hard_negative_sampling",
+        action="store_true",
+        help="don't use hard negative sampling in neighborhood il",
     )
     parser.add_argument(
-        "--easy_nagative_weight_decay", action="store_true", help="decay the weight of easy negative samples"
+        "--easy_nagative_weight_decay",
+        action="store_true",
+        help="decay the weight of easy negative samples",
     )
     parser.add_argument(
         "--no_update_alpha", action="store_true", help="don't update sac's alpha"
     )
     parser.add_argument(
-        "--terminate_when_unhealthy", action="store_true", help="terminate when unhealthy"
+        "--terminate_when_unhealthy",
+        action="store_true",
+        help="terminate when unhealthy",
     )
     parser.add_argument(
-        "--entropy_loss_weight_decay_rate", type=float, help="decay rate of entropy loss weight"
+        "--entropy_loss_weight_decay_rate",
+        type=float,
+        help="decay rate of entropy loss weight",
     )
     parser.add_argument(
         "--log_alpha_init", type=float, help="initial value of log_alpha"
