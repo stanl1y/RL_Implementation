@@ -52,6 +52,9 @@ def get_config():
         "--perturb_from_mid", action="store_true", default=False, help="When eval in ood mode, perturb from mid"
     )
     parser.add_argument(
+        "--perturb_with_repeated_action", action="store_true", default=False, help="Perturb agent with repeated action instead of random action"
+    )
+    parser.add_argument(
         "--perturb_step_num", type=int, default=10, help="number of perturb step"
     )
     parser.add_argument(

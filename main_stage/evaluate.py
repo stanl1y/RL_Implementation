@@ -14,13 +14,14 @@ class evaluate:
         self.perturb_from_mid = config.perturb_from_mid
         self.weight_path = config.weight_path
         self.perturb_step_num = config.perturb_step_num
+        self.perturb_with_repeated_action = config.perturb_with_repeated_action
         log_name = f"{self.algo}_{self.env_id}_eval"
         if self.ood:
             log_name += "_ood"
             if self.perturb_from_mid:
                 log_name += "_perturb_from_mid"
             log_name += f"{self.perturb_step_num}"
-        log_name+=(f"weight{self.weight_path.split('_')[-1]}")
+        log_name += f"weight{self.weight_path.split('_')[-1]}"
         wandb.init(
             project="RL_Implementation",
             name=log_name,
@@ -54,14 +55,18 @@ class evaluate:
             if self.ood:
                 if self.perturb_from_mid:
                     for _ in range(500):
-                        state, reward, done, info = env.step(
-                            action=agent.act(state, testing=True)
-                        )  # env.action_space.sample()
+                        action = agent.act(state, testing=True)
+                        state, reward, done, info = env.step(action)
                         total_reward += reward
                         if render:
                             frame_buffer.append(env.render(mode="rgb_array"))
+                else:
+                    action = agent.act(state, testing=True)
                 for _ in range(self.perturb_step_num):
-                    state, reward, done, info = env.step(env.action_space.sample())
+                    if self.perturb_with_repeated_action:
+                        state, reward, done, info = env.step(action)
+                    else:
+                        state, reward, done, info = env.step(env.action_space.sample())
                     total_reward += reward
                     if render:
                         frame_buffer.append(env.render(mode="rgb_array"))
