@@ -53,6 +53,7 @@ class set_state_il:
         self.easy_nagative_weight = 1
         self.easy_nagative_weight_decay_rate = config.easy_nagative_weight_decay_rate
         self.easy_nagative_weight_decay = config.easy_nagative_weight_decay
+        self.total_steps = 0
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -70,11 +71,12 @@ class set_state_il:
         expert_next_states = copy.deepcopy(storage.expert_next_states)
         strides = expert_next_states.strides
         # https://tinyurl.com/2zgc7mcb
+        window_size=self.explore_step+2
         self.expert_ns_data = np.lib.stride_tricks.as_strided(
             expert_next_states,
             shape=(
-                len(expert_next_states) - (self.explore_step - 1),
-                self.explore_step + 1,
+                len(expert_next_states) - (window_size),
+                window_size,
                 expert_next_states.shape[-1],
             ),
             strides=(strides[0], strides[0], strides[1]),
@@ -144,7 +146,7 @@ class set_state_il:
                         expert=True,
                         return_idx=True,
                         return_expert_env_states=True,
-                        exclude_tail_num=self.explore_step - 1,
+                        exclude_tail_num=self.explore_step + 2,
                     )
                     idx = idx.item()
                 if self.fix_env_random_seed:
@@ -185,7 +187,7 @@ class set_state_il:
                         expert=True,
                         return_idx=True,
                         return_expert_env_states=True,
-                        exclude_tail_num=self.explore_step - 1,
+                        exclude_tail_num=self.explore_step + 2,
                     )
                     obs = obs[0]
                     env.sim.set_state(expert_env_state)
@@ -217,6 +219,7 @@ class set_state_il:
                     self.use_env_done,
                     self.no_update_alpha,
                 )
+                self.total_steps += 1
                 if done:
                     break
             wandb.log(
@@ -228,6 +231,7 @@ class set_state_il:
                     **loss_info,
                     "neighbor_model_loss": neighbor_loss,
                     "easy_nagative_weight" : self.easy_nagative_weight,
+                    "total_steps": self.total_steps,
                 }
             )
             if hasattr(agent, "update_epsilon"):

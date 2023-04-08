@@ -51,6 +51,7 @@ class neighborhood_il:
         self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
         self.no_update_alpha = config.no_update_alpha
         self.infinite_neighbor_buffer = config.infinite_neighbor_buffer
+        self.total_steps = 0
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -221,6 +222,7 @@ class neighborhood_il:
                     self.use_env_done,
                     self.no_update_alpha,
                 )
+                self.total_steps += 1
             agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
             wandb.log(
                 {
@@ -231,6 +233,7 @@ class neighborhood_il:
                     **loss_info,
                     "neighbor_model_loss": neighbor_loss,
                     "entropy_loss_weight": agent.entropy_loss_weight,
+                    "total_steps": self.total_steps,
                 }
             )
             if hasattr(agent, "update_epsilon"):

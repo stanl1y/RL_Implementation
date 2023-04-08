@@ -204,10 +204,9 @@ class sac(base_agent):
 
         it is in the shape (len(state)*len(expert_state), 2*observation_dim)
         """
-
         cartesian_product_state = torch.cat(
             (
-                torch.repeat_interleave(next_state, explore_step+1, dim=0),
+                torch.repeat_interleave(next_state, explore_step+2, dim=0),
                 expert_ns_data[state_idx].reshape((-1, expert_ns_data.shape[-1])),
             ),
             dim=1,
@@ -292,7 +291,7 @@ class sac(base_agent):
             self.batch_size,
             expert=True,
             return_idx=True,
-            exclude_tail_num=explore_step - 1,
+            exclude_tail_num=explore_step + 2,
         )
         if not storage.to_tensor:
             expert_state = torch.FloatTensor(expert_state)
@@ -313,6 +312,7 @@ class sac(base_agent):
             expert_state_idx,
             explore_step,
         )
+
         expert_reward_mean = expert_reward.mean().item()
 
         actor_loss = {}
