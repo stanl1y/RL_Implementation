@@ -582,14 +582,14 @@ class sac(base_agent):
         )
 
     def save_weight(
-        self, best_testing_reward, algo, env_id, episodes, delete_prev_weight=True
+        self, best_testing_reward, algo, env_id, episodes, log_name="", delete_prev_weight=True
     ):
         dir_path = f"./trained_model/{algo}/{env_id}/"
         if not os.path.isdir(dir_path):
             os.makedirs(dir_path)
 
         file_path = os.path.join(
-            dir_path, f"episode{episodes}_reward{round(best_testing_reward,3)}.pt"
+            dir_path, f"episode{episodes}_reward{round(best_testing_reward,3)}{log_name}.pt"
         )
 
         if file_path == self.previous_checkpoint_path:

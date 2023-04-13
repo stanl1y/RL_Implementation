@@ -119,7 +119,7 @@ class set_state_il:
                         env.action_space.sample()
                     )  # env.action_space.sample()
             while not done:
-                action = agent.act(state, testing=False)
+                action = agent.act(state, testing=True)
                 # agent.q_network.reset_noise()
                 next_state, reward, done, info = env.step(action)
                 if render:

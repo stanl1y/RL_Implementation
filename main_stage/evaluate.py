@@ -15,6 +15,7 @@ class evaluate:
         self.weight_path = config.weight_path
         self.perturb_step_num = config.perturb_step_num
         self.perturb_with_repeated_action = config.perturb_with_repeated_action
+        self.log_name = config.log_name
         log_name = f"{self.algo}_{self.env_id}_eval"
         if self.ood:
             log_name += "_ood"
@@ -24,8 +25,9 @@ class evaluate:
             if self.perturb_with_repeated_action:
                 log_name += "_perturb_with_repeated_action"
         log_name += f"_weight{self.weight_path.split('_')[-1]}"
+        log_name += self.log_name
         wandb.init(
-            project="RL_Implementation",
+            project="Evaluate_IL",
             name=log_name,
             config=config,
         )
@@ -50,6 +52,7 @@ class evaluate:
                 ):
                     os.makedirs(f"./experiment_logs/{self.env_id}/{self.algo}_eval/")
                 save_dir = f"./experiment_logs/{self.env_id}/{self.algo}_eval/"
+        reward_list = []
         for i in range(self.episodes):
             state = env.reset()
             done = False
@@ -79,7 +82,7 @@ class evaluate:
                     frame_buffer.append(env.render(mode="rgb_array"))
                 total_reward += reward
                 state = next_state
-
+            reward_list.append(total_reward)
             # if self.ood:
             #     for _ in range(10):
             #         state, reward, done, info = env.step(
@@ -107,6 +110,17 @@ class evaluate:
                     "episode_num": i,
                 }
             )
+        reward_list.remove(max(reward_list))
+        reward_list.remove(min(reward_list))
+        wandb.log(
+            {
+                "testing_reward_mean": np.mean(reward_list),
+                "testing_reward_std": np.std(reward_list),
+                "testing_reward_max": np.max(reward_list),
+                "testing_reward_min": np.min(reward_list),
+            }
+        )
+
 
     def start(self, agent, env, storage):
         if self.weight_path:

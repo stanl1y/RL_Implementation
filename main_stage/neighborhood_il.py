@@ -80,9 +80,33 @@ class neighborhood_il:
             self.expert_ns_data = torch.tile(
                 expert_next_state, (self.batch_size, 1)
             ).to(device)
+            self.testing_expert_ns_data = (
+                torch.tile(expert_next_state, (1000, 1)).to(device).to(device)
+            )
+            self.testing_expert_ns_data0 = torch.repeat_interleave(
+                expert_next_state, 1000, dim=0
+            ).to(device)
         else:
             self.expert_ns_data = np.tile(expert_next_state, (self.batch_size, 1))
             self.expert_ns_data = torch.FloatTensor(self.expert_ns_data).to(device)
+            self.testing_expert_ns_data = np.tile(expert_next_state, (1000, 1))
+            self.testing_expert_ns_data = torch.FloatTensor(
+                self.testing_expert_ns_data
+            ).to(device)
+            self.testing_expert_ns_data0 = torch.FloatTensor(
+                np.repeat(expert_next_state, 1000, axis=0)
+            ).to(device)
+
+        self.expert_cartesian_product_state = torch.cat(
+            (
+                self.testing_expert_ns_data0,
+                # in mujoco, 1000 is the number of expert states
+                self.testing_expert_ns_data.reshape(
+                    (-1, self.testing_expert_ns_data.shape[-1])
+                ),
+            ),
+            dim=1,
+        )
 
         """
         generate label and weight for neighbor model training
@@ -134,15 +158,74 @@ class neighborhood_il:
         self.gen_data(storage)
         self.train(agent, env, storage)
 
+    def test_with_neighborhood_model(self, agent, env):
+        # agent.eval()
+        total_reward = []
+        total_expert_reward = []
+        for i in range(10):
+            state_dim = env.observation_space.shape[0]
+            traj_ns = np.ones((1000, state_dim))
+            mask = np.zeros(1000)
+            step_counter = 0
+            state = env.reset()
+            done = False
+            while not done:
+                action = agent.act(state, testing=True)
+                # agent.q_network.reset_noise()
+                next_state, reward, done, info = env.step(action)
+                state = next_state
+                traj_ns[step_counter] = next_state
+                step_counter += 1
+            mask[:step_counter] = 1
+            traj_ns = torch.FloatTensor(traj_ns).to(device)
+
+            cartesian_product_state = torch.cat(
+                (
+                    torch.repeat_interleave(traj_ns, 1000, dim=0),
+                    # in mujoco, 1000 is the number of expert states
+                    self.testing_expert_ns_data.reshape((-1, state_dim)),
+                ),
+                dim=1,
+            )
+
+            with torch.no_grad():
+                prob = self.NeighborhoodNet(cartesian_product_state)
+                expert_prob = self.NeighborhoodNet(self.expert_cartesian_product_state)
+            prob = prob.reshape((1000, 1000)).sum(dim=1)
+            prob = prob.cpu().numpy() * mask
+            reward = prob.sum()
+            expert_reward = expert_prob.cpu().numpy().sum()
+            total_reward.append(reward)
+            total_expert_reward.append(expert_reward)
+        total_reward_mean = np.array(total_reward).mean()
+        total_expert_reward_mean = np.array(total_expert_reward).mean()
+        total_reward_std = np.array(total_reward).std()
+        total_expert_reward_std = np.array(total_expert_reward).std()
+        total_reward_min = np.array(total_reward).min()
+        total_expert_reward_min = np.array(total_expert_reward).min()
+        total_reward_max = np.array(total_reward).max()
+        total_expert_reward_max = np.array(total_expert_reward).max()
+        return {
+            "neighborhood_agent_reward_mean": total_reward_mean,
+            "neighborhood_expert_reward_mean": total_expert_reward_mean,
+            "neighborhood_agent_reward_std": total_reward_std,
+            "neighborhood_expert_reward_std": total_expert_reward_std,
+            "neighborhood_agent_reward_min": total_reward_min,
+            "neighborhood_expert_reward_min": total_expert_reward_min,
+            "neighborhood_agent_reward_max": total_reward_max,
+            "neighborhood_expert_reward_max": total_expert_reward_max,
+            "relative_neighborhood_agent_reward": total_reward_mean/total_expert_reward_mean,
+        }
+
     def test(self, agent, env, render_id=0):
         # agent.eval()
-        total_reward = 0
+        total_reward = []
         render = self.render and render_id % 40 == 0
         if render:
             frame_buffer = []
             if not os.path.exists(f"./experiment_logs/{self.env_id}/{self.log_name}/"):
                 os.makedirs(f"./experiment_logs/{self.env_id}/{self.log_name}/")
-        for i in range(3):
+        for i in range(10):
             state = env.reset()
             done = False
             if self.ood:
@@ -151,21 +234,30 @@ class neighborhood_il:
                         env.action_space.sample()
                     )  # env.action_space.sample()
             while not done:
-                action = agent.act(state, testing=False)
+                action = agent.act(state, testing=True)
                 # agent.q_network.reset_noise()
                 next_state, reward, done, info = env.step(action)
                 if render:
                     frame_buffer.append(env.render(mode="rgb_array"))
-                total_reward += reward
                 state = next_state
+            total_reward.append(reward)
+
         if render:
             imageio.mimsave(
                 f"./experiment_logs/{self.env_id}/{self.log_name}/{render_id}.gif",
                 frame_buffer,
             )
-        total_reward /= 3
+        total_reward_mean = np.array(total_reward).mean()
+        total_reward_std = np.array(total_reward).std()
+        total_reward_min = np.array(total_reward).min()
+        total_reward_max = np.array(total_reward).max()
         # agent.train()
-        return total_reward
+        return {
+            "agent_reward_mean": total_reward_mean,
+            "agent_reward_std": total_reward_std,
+            "agent_reward_min": total_reward_min,
+            "agent_reward_max": total_reward_max,
+        }
 
     def train(self, agent, env, storage):
         if self.buffer_warmup:
@@ -243,15 +335,17 @@ class neighborhood_il:
                 testing_reward = self.test(
                     agent, env, render_id=episode if self.render else None
                 )
-                if testing_reward > best_testing_reward:
-                    agent.cache_weight()
-                    best_testing_reward = testing_reward
-                    best_episode = episode
+                if testing_reward["agent_reward_mean"] > best_testing_reward:
+                    self.save_model_weight(
+                        agent, episode, testing_reward["agent_reward_mean"]
+                    )
+                neighbor_testing_reward = self.test_with_neighborhood_model(agent, env)
                 wandb.log(
                     {
-                        "testing_reward": testing_reward,
+                        **testing_reward,
                         "testing_episode_num": episode,
                         "best_testing_reward": best_testing_reward,
+                        **neighbor_testing_reward,
                     }
                 )
                 if hasattr(env, "eval_toy_q"):
@@ -263,28 +357,49 @@ class neighborhood_il:
                         episode,
                         self.oracle_neighbor,
                     )
-            if episode % self.save_weight_period == 0 and not self.oracle_neighbor:
-                agent.save_weight(
-                    best_testing_reward, "neighborhood_il", self.env_id, best_episode
-                )
-                path = f"./trained_model/neighborhood/{self.env_id}/"
-                if not os.path.isdir(path):
-                    os.makedirs(path)
-                data = {
-                    "episodes": episode,
-                    "neighborhood_state_dict": self.NeighborhoodNet.state_dict(),
-                    "neighborhood_optimizer_state_dict": self.NeighborhoodNet_optimizer.state_dict(),
-                }
-
-                file_path = os.path.join(path, f"episode{episode}_{self.log_name}.pt")
-                torch.save(data, file_path)
-                try:
-                    os.remove(self.previous_checkpoint_path)
-                except:
-                    pass
-                self.previous_checkpoint_path = file_path
             if self.auto_threshold_ratio:
                 self.policy_threshold_ratio *= self.threshold_discount_factor
+
+    def save_model_weight(
+        self, agent, episode, best_testing_reward, oracle_reward=True
+    ):
+        agent.cache_weight()
+        self.bestNeighborhoodNet = copy.deepcopy(self.NeighborhoodNet)
+        agent.save_weight(
+            best_testing_reward=best_testing_reward,
+            algo="neighborhood_il",
+            env_id=self.env_id,
+            episodes=episode,
+            log_name=self.log_name + ("_oracle" if oracle_reward else "_neighbor"),
+        )
+        path = f"./trained_model/neighborhood/{self.env_id}/"
+        if not os.path.isdir(path):
+            os.makedirs(path)
+        data = {
+            "episodes": episode,
+            "neighborhood_state_dict": self.bestNeighborhoodNet.state_dict(),
+            "neighborhood_optimizer_state_dict": self.NeighborhoodNet_optimizer.state_dict(),
+        }
+
+        file_path = os.path.join(
+            path,
+            f"episode{episode}_reward{round(best_testing_reward,3)}_{self.log_name}"
+            + ("_oracle" if oracle_reward else "_neighbor")
+            + ".pt",
+        )
+        torch.save(data, file_path)
+        if oracle_reward:
+            try:
+                os.remove(self.previous_checkpoint_path)
+            except:
+                pass
+            self.previous_checkpoint_path = file_path
+        else:
+            try:
+                os.remove(self.neighbor_reward_previous_checkpoint_path)
+            except:
+                pass
+            self.neighbor_reward_previous_checkpoint_path = file_path
 
     def update_neighbor_model(self, storage):
         state, action, reward, next_state, done = storage.sample(
