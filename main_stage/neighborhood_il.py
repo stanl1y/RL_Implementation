@@ -158,68 +158,73 @@ class neighborhood_il:
         self.gen_data(storage)
         self.train(agent, env, storage)
 
-    def test_with_neighborhood_model(self, agent, env):
-        # agent.eval()
-        total_reward = []
-        for i in range(10):
-            state_dim = env.observation_space.shape[0]
-            traj_ns = np.ones((1000, state_dim))
-            mask = np.zeros(1000)
-            step_counter = 0
-            state = env.reset()
-            done = False
-            while not done:
-                action = agent.act(state, testing=True)
-                # agent.q_network.reset_noise()
-                next_state, _, done, info = env.step(action)
-                state = next_state
-                traj_ns[step_counter] = next_state
-                step_counter += 1
-            mask[:step_counter] = 1
-            traj_ns = torch.FloatTensor(traj_ns).to(device)
+    # def test_with_neighborhood_model(self, agent, env):
+    #     # agent.eval()
+    #     total_reward = []
+    #     for i in range(10):
+    #         state_dim = env.observation_space.shape[0]
+    #         traj_ns = np.ones((1000, state_dim))
+    #         mask = np.zeros(1000)
+    #         step_counter = 0
+    #         state = env.reset()
+    #         done = False
+    #         while not done:
+    #             action = agent.act(state, testing=True)
+    #             # agent.q_network.reset_noise()
+    #             next_state, _, done, info = env.step(action)
+    #             state = next_state
+    #             traj_ns[step_counter] = next_state
+    #             step_counter += 1
+    #         mask[:step_counter] = 1
+    #         traj_ns = torch.FloatTensor(traj_ns).to(device)
 
-            cartesian_product_state = torch.cat(
-                (
-                    torch.repeat_interleave(traj_ns, 1000, dim=0),
-                    # in mujoco, 1000 is the number of expert states
-                    self.testing_expert_ns_data.reshape((-1, state_dim)),
-                ),
-                dim=1,
-            )
+    #         cartesian_product_state = torch.cat(
+    #             (
+    #                 torch.repeat_interleave(traj_ns, 1000, dim=0),
+    #                 # in mujoco, 1000 is the number of expert states
+    #                 self.testing_expert_ns_data.reshape((-1, state_dim)),
+    #             ),
+    #             dim=1,
+    #         )
 
-            with torch.no_grad():
-                prob = self.NeighborhoodNet(cartesian_product_state)
-            prob = prob.reshape((1000, 1000)).sum(dim=1)
-            prob = prob.cpu().numpy() * mask
-            reward = prob.sum()
-            total_reward.append(reward)
-        with torch.no_grad():
-            expert_prob = self.NeighborhoodNet(self.expert_cartesian_product_state)
-        expert_reward = expert_prob.cpu().numpy().sum()
+    #         with torch.no_grad():
+    #             prob = self.NeighborhoodNet(cartesian_product_state)
+    #         prob = prob.reshape((1000, 1000)).sum(dim=1)
+    #         prob = prob.cpu().numpy() * mask
+    #         reward = prob.sum()
+    #         total_reward.append(reward)
+    #     with torch.no_grad():
+    #         expert_prob = self.NeighborhoodNet(self.expert_cartesian_product_state)
+    #     expert_reward = expert_prob.cpu().numpy().sum()
 
-        total_reward = np.array(total_reward)
-        total_reward_mean = total_reward.mean()
-        total_reward_std = total_reward.std()
-        total_reward_min = total_reward.min()
-        total_reward_max = total_reward.max()
-        return {
-            "neighborhood_agent_reward_mean": total_reward_mean,
-            "neighborhood_expert_reward": expert_reward,
-            "neighborhood_agent_reward_std": total_reward_std,
-            "neighborhood_agent_reward_min": total_reward_min,
-            "neighborhood_agent_reward_max": total_reward_max,
-            "relative_neighborhood_agent_reward": total_reward_mean / expert_reward,
-        }
+    #     total_reward = np.array(total_reward)
+    #     total_reward_mean = total_reward.mean()
+    #     total_reward_std = total_reward.std()
+    #     total_reward_min = total_reward.min()
+    #     total_reward_max = total_reward.max()
+    #     return {
+    #         "neighborhood_agent_reward_mean": total_reward_mean,
+    #         "neighborhood_expert_reward": expert_reward,
+    #         "neighborhood_agent_reward_std": total_reward_std,
+    #         "neighborhood_agent_reward_min": total_reward_min,
+    #         "neighborhood_agent_reward_max": total_reward_max,
+    #         "relative_neighborhood_agent_reward": total_reward_mean / expert_reward,
+    #     }
 
     def test(self, agent, env, render_id=0):
         # agent.eval()
         total_reward = []
+        total_neighborhood_reward = []
         render = self.render and render_id % 40 == 0
         if render:
             frame_buffer = []
             if not os.path.exists(f"./experiment_logs/{self.env_id}/{self.log_name}/"):
                 os.makedirs(f"./experiment_logs/{self.env_id}/{self.log_name}/")
         for i in range(10):
+            state_dim = env.observation_space.shape[0]
+            traj_ns = np.ones((1000, state_dim))
+            mask = np.zeros(1000)
+            step_counter = 0
             state = env.reset()
             done = False
             episode_reward = 0
@@ -236,8 +241,34 @@ class neighborhood_il:
                 if render:
                     frame_buffer.append(env.render(mode="rgb_array"))
                 state = next_state
+                traj_ns[step_counter] = next_state
+                step_counter += 1
             total_reward.append(episode_reward)
 
+            mask[:step_counter] = 1
+            traj_ns = torch.FloatTensor(traj_ns).to(device)
+            cartesian_product_state = torch.cat(
+                (
+                    torch.repeat_interleave(traj_ns, 1000, dim=0),
+                    # in mujoco, 1000 is the number of expert states
+                    self.testing_expert_ns_data.reshape((-1, state_dim)),
+                ),
+                dim=1,
+            )
+            with torch.no_grad():
+                prob = self.NeighborhoodNet(cartesian_product_state)
+            prob = prob.reshape((1000, 1000)).sum(dim=1)
+            prob = prob.cpu().numpy() * mask
+            reward = prob.sum()
+            total_neighborhood_reward.append(reward)
+        with torch.no_grad():
+            expert_prob = self.NeighborhoodNet(self.expert_cartesian_product_state)
+        expert_reward = expert_prob.cpu().numpy().sum()
+        total_neighborhood_reward = np.array(total_neighborhood_reward)
+        total_neighborhood_reward_mean = total_neighborhood_reward.mean()
+        total_neighborhood_reward_std = total_neighborhood_reward.std()
+        total_neighborhood_reward_min = total_neighborhood_reward.min()
+        total_neighborhood_reward_max = total_neighborhood_reward.max()
         if render:
             imageio.mimsave(
                 f"./experiment_logs/{self.env_id}/{self.log_name}/{render_id}.gif",
@@ -254,6 +285,13 @@ class neighborhood_il:
             "testing_reward_std": total_reward_std,
             "testing_reward_min": total_reward_min,
             "testing_reward_max": total_reward_max,
+            "neighborhood_agent_reward_mean": total_neighborhood_reward_mean,
+            "neighborhood_expert_reward": expert_reward,
+            "neighborhood_agent_reward_std": total_neighborhood_reward_std,
+            "neighborhood_agent_reward_min": total_neighborhood_reward_min,
+            "neighborhood_agent_reward_max": total_neighborhood_reward_max,
+            "relative_neighborhood_agent_reward": total_neighborhood_reward_mean
+            / expert_reward,
         }
 
     def train(self, agent, env, storage):
@@ -337,12 +375,12 @@ class neighborhood_il:
                     self.best_testing_reward = testing_reward["testing_reward_mean"]
                     self.save_model_weight(agent, episode)
 
-                neighbor_testing_reward = self.test_with_neighborhood_model(agent, env)
+                # neighbor_testing_reward = self.test_with_neighborhood_model(agent, env)
                 if (
-                    neighbor_testing_reward["relative_neighborhood_agent_reward"]
+                    testing_reward["relative_neighborhood_agent_reward"]
                     > self.best_testing_neighborhood_reward
                 ):
-                    self.best_testing_neighborhood_reward = neighbor_testing_reward[
+                    self.best_testing_neighborhood_reward = testing_reward[
                         "relative_neighborhood_agent_reward"
                     ]
                     self.save_model_weight(agent, episode, oracle_reward=False)
@@ -352,7 +390,6 @@ class neighborhood_il:
                         "testing_episode_num": episode,
                         "best_testing_reward": self.best_testing_reward,
                         "best_testing_neighborhood_reward": self.best_testing_neighborhood_reward,
-                        **neighbor_testing_reward,
                     }
                 )
                 if hasattr(env, "eval_toy_q"):
