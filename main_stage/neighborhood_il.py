@@ -161,7 +161,6 @@ class neighborhood_il:
     def test_with_neighborhood_model(self, agent, env):
         # agent.eval()
         total_reward = []
-        total_expert_reward = []
         for i in range(10):
             state_dim = env.observation_space.shape[0]
             traj_ns = np.ones((1000, state_dim))
@@ -172,7 +171,7 @@ class neighborhood_il:
             while not done:
                 action = agent.act(state, testing=True)
                 # agent.q_network.reset_noise()
-                next_state, reward, done, info = env.step(action)
+                next_state, _, done, info = env.step(action)
                 state = next_state
                 traj_ns[step_counter] = next_state
                 step_counter += 1
@@ -190,31 +189,26 @@ class neighborhood_il:
 
             with torch.no_grad():
                 prob = self.NeighborhoodNet(cartesian_product_state)
-                expert_prob = self.NeighborhoodNet(self.expert_cartesian_product_state)
             prob = prob.reshape((1000, 1000)).sum(dim=1)
             prob = prob.cpu().numpy() * mask
             reward = prob.sum()
-            expert_reward = expert_prob.cpu().numpy().sum()
             total_reward.append(reward)
-            total_expert_reward.append(expert_reward)
-        total_reward_mean = np.array(total_reward).mean()
-        total_expert_reward_mean = np.array(total_expert_reward).mean()
-        total_reward_std = np.array(total_reward).std()
-        total_expert_reward_std = np.array(total_expert_reward).std()
-        total_reward_min = np.array(total_reward).min()
-        total_expert_reward_min = np.array(total_expert_reward).min()
-        total_reward_max = np.array(total_reward).max()
-        total_expert_reward_max = np.array(total_expert_reward).max()
+        with torch.no_grad():
+            expert_prob = self.NeighborhoodNet(self.expert_cartesian_product_state)
+        expert_reward = expert_prob.cpu().numpy().sum()
+
+        total_reward = np.array(total_reward)
+        total_reward_mean = total_reward.mean()
+        total_reward_std = total_reward.std()
+        total_reward_min = total_reward.min()
+        total_reward_max = total_reward.max()
         return {
             "neighborhood_agent_reward_mean": total_reward_mean,
-            "neighborhood_expert_reward_mean": total_expert_reward_mean,
+            "neighborhood_expert_reward": expert_reward,
             "neighborhood_agent_reward_std": total_reward_std,
-            "neighborhood_expert_reward_std": total_expert_reward_std,
             "neighborhood_agent_reward_min": total_reward_min,
-            "neighborhood_expert_reward_min": total_expert_reward_min,
             "neighborhood_agent_reward_max": total_reward_max,
-            "neighborhood_expert_reward_max": total_expert_reward_max,
-            "relative_neighborhood_agent_reward": total_reward_mean/total_expert_reward_mean,
+            "relative_neighborhood_agent_reward": total_reward_mean / expert_reward,
         }
 
     def test(self, agent, env, render_id=0):
@@ -228,6 +222,7 @@ class neighborhood_il:
         for i in range(10):
             state = env.reset()
             done = False
+            episode_reward = 0
             if self.ood:
                 for _ in range(5):
                     state, reward, done, info = env.step(
@@ -237,26 +232,28 @@ class neighborhood_il:
                 action = agent.act(state, testing=True)
                 # agent.q_network.reset_noise()
                 next_state, reward, done, info = env.step(action)
+                episode_reward += reward
                 if render:
                     frame_buffer.append(env.render(mode="rgb_array"))
                 state = next_state
-            total_reward.append(reward)
+            total_reward.append(episode_reward)
 
         if render:
             imageio.mimsave(
                 f"./experiment_logs/{self.env_id}/{self.log_name}/{render_id}.gif",
                 frame_buffer,
             )
-        total_reward_mean = np.array(total_reward).mean()
-        total_reward_std = np.array(total_reward).std()
-        total_reward_min = np.array(total_reward).min()
-        total_reward_max = np.array(total_reward).max()
+        total_reward = np.array(total_reward)
+        total_reward_mean = total_reward.mean()
+        total_reward_std = total_reward.std()
+        total_reward_min = total_reward.min()
+        total_reward_max = total_reward.max()
         # agent.train()
         return {
-            "agent_reward_mean": total_reward_mean,
-            "agent_reward_std": total_reward_std,
-            "agent_reward_min": total_reward_min,
-            "agent_reward_max": total_reward_max,
+            "testing_reward_mean": total_reward_mean,
+            "testing_reward_std": total_reward_std,
+            "testing_reward_min": total_reward_min,
+            "testing_reward_max": total_reward_max,
         }
 
     def train(self, agent, env, storage):
@@ -272,7 +269,8 @@ class neighborhood_il:
                     done = False
                 else:
                     state = next_state
-        best_testing_reward = -1e7
+        self.best_testing_reward = -1e7
+        self.best_testing_neighborhood_reward = -1e7
         best_episode = 0
         print("warmup finished")
         for episode in range(self.episodes):
@@ -335,16 +333,25 @@ class neighborhood_il:
                 testing_reward = self.test(
                     agent, env, render_id=episode if self.render else None
                 )
-                if testing_reward["agent_reward_mean"] > best_testing_reward:
-                    self.save_model_weight(
-                        agent, episode, testing_reward["agent_reward_mean"]
-                    )
+                if testing_reward["testing_reward_mean"] > self.best_testing_reward:
+                    self.best_testing_reward = testing_reward["testing_reward_mean"]
+                    self.save_model_weight(agent, episode)
+
                 neighbor_testing_reward = self.test_with_neighborhood_model(agent, env)
+                if (
+                    neighbor_testing_reward["relative_neighborhood_agent_reward"]
+                    > self.best_testing_neighborhood_reward
+                ):
+                    self.best_testing_neighborhood_reward = neighbor_testing_reward[
+                        "relative_neighborhood_agent_reward"
+                    ]
+                    self.save_model_weight(agent, episode, oracle_reward=False)
                 wandb.log(
                     {
                         **testing_reward,
                         "testing_episode_num": episode,
-                        "best_testing_reward": best_testing_reward,
+                        "best_testing_reward": self.best_testing_reward,
+                        "best_testing_neighborhood_reward": self.best_testing_neighborhood_reward,
                         **neighbor_testing_reward,
                     }
                 )
@@ -360,13 +367,14 @@ class neighborhood_il:
             if self.auto_threshold_ratio:
                 self.policy_threshold_ratio *= self.threshold_discount_factor
 
-    def save_model_weight(
-        self, agent, episode, best_testing_reward, oracle_reward=True
-    ):
+    def save_model_weight(self, agent, episode, oracle_reward=True):
+        if oracle_reward:
+            best_reward = self.best_testing_reward
+        else:
+            best_reward = self.best_testing_neighborhood_reward
         agent.cache_weight()
-        self.bestNeighborhoodNet = copy.deepcopy(self.NeighborhoodNet)
         agent.save_weight(
-            best_testing_reward=best_testing_reward,
+            best_testing_reward=best_reward,
             algo="neighborhood_il",
             env_id=self.env_id,
             episodes=episode,
@@ -377,13 +385,13 @@ class neighborhood_il:
             os.makedirs(path)
         data = {
             "episodes": episode,
-            "neighborhood_state_dict": self.bestNeighborhoodNet.state_dict(),
+            "neighborhood_state_dict": self.NeighborhoodNet.state_dict(),
             "neighborhood_optimizer_state_dict": self.NeighborhoodNet_optimizer.state_dict(),
         }
 
         file_path = os.path.join(
             path,
-            f"episode{episode}_reward{round(best_testing_reward,3)}_{self.log_name}"
+            f"episode{episode}_reward{round(best_reward,4)}_{self.log_name}"
             + ("_oracle" if oracle_reward else "_neighbor")
             + ".pt",
         )
