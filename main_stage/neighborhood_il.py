@@ -329,7 +329,7 @@ class neighborhood_il:
             if hasattr(agent, "update_epsilon"):
                 agent.update_epsilon()
 
-            if episode % 5 == 0:
+            if episode % 5 == 0 and episode > 0:
                 testing_reward = self.test(
                     agent, env, render_id=episode if self.render else None
                 )
