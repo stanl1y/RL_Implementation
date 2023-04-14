@@ -89,6 +89,11 @@ def get_config():
         help="don't use hard negative sampling in neighborhood il",
     )
     parser.add_argument(
+        "--bc_pretraining",
+        action="store_true",
+        help="use behavioral cloning to pretrain policy",
+    )
+    parser.add_argument(
         "--easy_nagative_weight_decay",
         action="store_true",
         help="decay the weight of easy negative samples",

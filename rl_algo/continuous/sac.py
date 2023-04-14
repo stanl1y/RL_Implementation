@@ -147,14 +147,17 @@ class sac(base_agent):
             "filtered": filtered,
         }
 
-    def bc_update(self, expert_state, expert_action):
+    def bc_update(self, expert_state, expert_action, use_mu=True):
         # if not hasattr(self, "bc_optimizer") or not hasattr(self, "bc_criterion"):
         #     self.bc_optimizer = torch.optim.Adam(
         #         self.actor.parameters(), lr=self.actor_lr
         #     )
         self.bc_criterion = nn.MSELoss()
         action, log_prob, mu = self.actor.sample(expert_state)
-        bc_loss = self.bc_criterion(mu, expert_action)
+        if use_mu:
+            bc_loss = self.bc_criterion(mu, expert_action)
+        else:
+            bc_loss = self.bc_criterion(action, expert_action)
 
         self.actor_optimizer.zero_grad()
         bc_loss.backward()

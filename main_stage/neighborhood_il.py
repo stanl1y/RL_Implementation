@@ -51,6 +51,7 @@ class neighborhood_il:
         self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
         self.no_update_alpha = config.no_update_alpha
         self.infinite_neighbor_buffer = config.infinite_neighbor_buffer
+        self.bc_pretraining = config.bc_pretraining
         self.total_steps = 0
         if self.hard_negative_sampling:
             print("hard negative sampling")
@@ -295,6 +296,19 @@ class neighborhood_il:
         }
 
     def train(self, agent, env, storage):
+        if self.bc_pretraining:
+            (expert_state, expert_action, _, _, _, _,) = storage.sample(
+                self.batch_size,
+                expert=True,
+            )
+            if not storage.to_tensor:
+                expert_state = torch.FloatTensor(expert_state)
+                expert_action = torch.FloatTensor(expert_action)
+            expert_state = expert_state.to(device)
+            expert_action = expert_action.to(device)
+            for _ in range(50000):
+                bc_loss = agent.bc_update(expert_state, expert_action, use_mu=False)
+            print(f"BC pretraining finished, BC loss:{bc_loss}")
         if self.buffer_warmup:
             state = env.reset()
             done = False
