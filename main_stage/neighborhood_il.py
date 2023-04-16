@@ -430,6 +430,7 @@ class neighborhood_il:
             env_id=self.env_id,
             episodes=episode,
             log_name=self.log_name + ("_oracle" if oracle_reward else "_neighbor"),
+            oracle_reward=oracle_reward,
         )
         path = f"./trained_model/neighborhood/{self.env_id}/"
         if not os.path.isdir(path):

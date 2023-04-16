@@ -585,7 +585,7 @@ class sac(base_agent):
         )
 
     def save_weight(
-        self, best_testing_reward, algo, env_id, episodes, log_name="", delete_prev_weight=True
+        self, best_testing_reward, algo, env_id, episodes, log_name="", delete_prev_weight=True, oracle_reward=True
     ):
         dir_path = f"./trained_model/{algo}/{env_id}/"
         if not os.path.isdir(dir_path):
@@ -614,12 +614,19 @@ class sac(base_agent):
             data[f"critic_optimizer_state_dict{idx}"] = optimizer.state_dict()
 
         torch.save(data, file_path)
-        if delete_prev_weight and self.previous_checkpoint_path is not None:
-            try:
-                os.remove(self.previous_checkpoint_path)
-            except:
-                pass
-        self.previous_checkpoint_path = file_path
+        if delete_prev_weight:
+            if oracle_reward:
+                try:
+                    os.remove(self.previous_checkpoint_path)
+                except:
+                    pass
+                self.previous_checkpoint_path = file_path
+            else:
+                try:
+                    os.remove(self.neighbor_reward_previous_checkpoint_path)
+                except:
+                    pass
+                self.neighbor_reward_previous_checkpoint_path = file_path
 
     def load_weight(self, algo="sac", env_id=None, path=None):
         if path is None:
