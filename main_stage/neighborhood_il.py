@@ -337,7 +337,7 @@ class neighborhood_il:
                     neighbor_loss = self.update_neighbor_model(storage)
                 wandb.log({"neighbor_model_loss": neighbor_loss}, commit=False)
             if self.hybrid and np.random.rand() < 0.2:
-                state, _, _, _, done, expert_env_state, _ = storage.sample(
+                state, _, _, _, done, expert_env_state = storage.sample(
                     batch_size=1,
                     expert=True,
                     return_expert_env_states=True,
