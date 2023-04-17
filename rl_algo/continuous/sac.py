@@ -145,6 +145,8 @@ class sac(base_agent):
             "alpha_loss": alpha_loss,
             "alpha": self.alpha,
             "filtered": filtered,
+            "entropy_loss": entropy_loss.mean(),
+            "log_prob": log_prob.mean(),
         }
 
     def bc_update(self, expert_state, expert_action, use_mu=True):
