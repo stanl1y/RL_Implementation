@@ -107,6 +107,11 @@ def get_config():
         help="terminate when unhealthy",
     )
     parser.add_argument(
+        "--hybrid",
+        action="store_true",
+        help="set state in neighborhood il",
+    )
+    parser.add_argument(
         "--entropy_loss_weight_decay_rate",
         type=float,
         help="decay rate of entropy loss weight",

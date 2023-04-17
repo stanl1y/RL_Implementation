@@ -52,6 +52,7 @@ class neighborhood_il:
         self.no_update_alpha = config.no_update_alpha
         self.infinite_neighbor_buffer = config.infinite_neighbor_buffer
         self.bc_pretraining = config.bc_pretraining
+        self.hybrid = config.hybrid
         self.total_steps = 0
         if self.hard_negative_sampling:
             print("hard negative sampling")
@@ -335,10 +336,22 @@ class neighborhood_il:
                 for _ in range(self.update_neighbor_step):
                     neighbor_loss = self.update_neighbor_model(storage)
                 wandb.log({"neighbor_model_loss": neighbor_loss}, commit=False)
-            if self.fix_env_random_seed:
-                state = env.reset(seed=0)
+            if self.hybrid and np.random.rand() < 0.2:
+                state, _, _, _, done, expert_env_state, _ = storage.sample(
+                    batch_size=1,
+                    expert=True,
+                    return_expert_env_states=True,
+                    exclude_tail_num=1,
+                )
+                env.reset()
+                env.sim.set_state(expert_env_state)
+                env.sim.forward()
+                state = state[0]
             else:
-                state = env.reset()
+                if self.fix_env_random_seed:
+                    state = env.reset(seed=0)
+                else:
+                    state = env.reset()
             done = False
             total_reward = 0
             while not done:
