@@ -127,19 +127,30 @@ class neighborhood_il:
             .view((-1, 1))
             .to(device)
         )
-        self.neighbor_loss_weight = (
-            torch.cat(
-                (
-                    torch.ones(self.batch_size) * self.neighbor_model_alpha,
-                    torch.ones(
-                        self.batch_size * (2 if self.hard_negative_sampling else 1)
+        if self.hard_negative_sampling:
+
+            self.neighbor_loss_weight = (
+                torch.cat(
+                    (
+                        torch.ones(self.batch_size) * self.neighbor_model_alpha,
+                        torch.ones(self.batch_size) * (1 - self.neighbor_model_alpha),
+                        torch.ones(self.batch_size),
                     )
-                    * (1 - self.neighbor_model_alpha),
                 )
+                .view((-1, 1))
+                .to(device)
             )
-            .view((-1, 1))
-            .to(device)
-        )
+        else:
+            self.neighbor_loss_weight = (
+                torch.cat(
+                    (
+                        torch.ones(self.batch_size) * self.neighbor_model_alpha,
+                        torch.ones(self.batch_size) * (1 - self.neighbor_model_alpha),
+                    )
+                )
+                .view((-1, 1))
+                .to(device)
+            )
 
     def start(self, agent, env, storage, util_dict):
         if self.oracle_neighbor:

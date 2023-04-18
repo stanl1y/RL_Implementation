@@ -1,17 +1,47 @@
 import pickle
 import os
-env_id="Humanoid-v3"
-algo="sac"
-path = f"./saved_expert_transition/{env_id}/{algo}/"
-onlyfiles = [
-                os.path.join(path, f)
-                for f in os.listdir(path)
-                if os.path.isfile(os.path.join(path, f))
-            ]
-path = onlyfiles[0]
+import numpy as np
+path = f"./saved_expert_transition/Humanoid-v3/sac/episode_num1_6494.pkl"#humanoid_sgld_max.pkl
 with open(path, "rb") as handle:
     data = pickle.load(handle)
-rewards=0
-for r in data["rewards"]:
-    rewards+=r
-print(rewards)
+    print(data["states"][:5])
+    print(data["actions"][:5])
+print("-----")
+path = f"./saved_expert_transition/Humanoid-v3/sac/episode_num1_7463.pkl"#humanoid_sgld_max.pkl
+with open(path, "rb") as handle:
+    data = pickle.load(handle)
+    print(data["states"][:5])
+    print(data["actions"][:5])
+
+# print(data.keys())
+# path = f"./saved_expert_transition/Humanoid-v3/sac/humanoid_sgld_max.pkl"#humanoid_sgld_max.pkl
+# with open(path, "rb") as handle:
+#     data = pickle.load(handle)
+# tmp={}
+# tmp["states"]=[]
+# tmp["actions"]=[]
+# tmp["rewards"]=[]
+# tmp["next_states"]=[]
+# tmp["dones"]=[]
+# tmp["env_states"]=[]
+# for (s,o,a,o2,r,ep_l) in data:
+#     tmp["states"].append(o)
+#     tmp["actions"].append(a)
+#     tmp["rewards"].append(r)
+#     tmp["next_states"].append(o2)
+#     tmp["dones"].append(0)
+#     tmp["env_states"].append(s)
+# tmp["states"]=np.array(tmp["states"])
+# tmp["actions"]=np.array(tmp["actions"])
+# tmp["rewards"]=np.array(tmp["rewards"])
+# tmp["next_states"]=np.array(tmp["next_states"])
+# tmp["dones"]=np.array(tmp["dones"])
+# print(tmp["rewards"].sum())
+
+# dump_path = f"./saved_expert_transition/Humanoid-v3/sac/episode_num1_7463.pkl"
+# with open(dump_path, "wb") as handle:
+#     pickle.dump(tmp, handle)
+
+
+
+
