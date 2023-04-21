@@ -84,6 +84,11 @@ def get_config():
         help="don't use behavior cloning when neighborhood il",
     )
     parser.add_argument(
+        "--use_relative_reward",
+        action="store_true",
+        help="use relative reward when training neighborhood il",
+    )
+    parser.add_argument(
         "--no_hard_negative_sampling",
         action="store_true",
         help="don't use hard negative sampling in neighborhood il",

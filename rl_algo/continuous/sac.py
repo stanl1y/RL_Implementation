@@ -459,6 +459,7 @@ class sac(base_agent):
         storage,
         NeighborhoodNet,
         expert_ns_data,
+        expert_reward_ones,
         margin_value,
         bc_only=False,
         no_bc=False,
@@ -467,6 +468,7 @@ class sac(base_agent):
         policy_threshold_ratio=0.5,
         use_env_done=False,
         no_update_alpha=False,
+        use_relative_reward=False,
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -528,16 +530,23 @@ class sac(base_agent):
         if not bc_only:
             actor_loss = self.update_actor(
                 state,
-                reward=reward,
-                threshold=expert_reward_mean * policy_threshold_ratio,
+                # reward=reward,
+                # threshold=expert_reward_mean * policy_threshold_ratio,
                 no_update_alpha=no_update_alpha,
             )
+            # expert_actor_loss = self.update_actor( 
+            #     expert_state,
+            #     no_update_alpha=no_update_alpha,
+            # )
         # print("update actor time", time.time() - t)
         # t = time.time()
+        if use_relative_reward:
+            ralative_reward=reward/(expert_reward_mean+1e-6)
+            relative_expert_reward=expert_reward_ones
         critic_loss = self.update_critic(
             state,
             action,
-            reward,
+            ralative_reward if use_relative_reward else reward,
             next_state,
             done,
         )
@@ -546,7 +555,7 @@ class sac(base_agent):
         expert_critic_loss = self.update_critic(
             expert_state,
             expert_action,
-            expert_reward,
+            relative_expert_reward if use_relative_reward else expert_reward,
             expert_next_state,
             expert_done,
         )
@@ -560,9 +569,11 @@ class sac(base_agent):
             (key, expert_critic_loss[expert_keys[key]]) for key in expert_keys.keys()
         )
         reward_dict = {
-            "expert_reward_mean": expert_reward_mean,
-            "sampled_exp_reward_mean": reward.mean().item(),
+            "sampled_expert_reward_mean": expert_reward_mean,
+            "sampled_agent_reward_mean": reward.mean().item(),
         }
+        if use_relative_reward:
+            reward_dict["sampled_agent_relative_reward_mean"]=ralative_reward.mean().item()
         if no_bc:
             bc_loss = 0
         else:

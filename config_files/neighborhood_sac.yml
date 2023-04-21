@@ -108,3 +108,5 @@ bc_pretraining:
   False
 hybrid:
   False
+use_relative_reward:
+  False

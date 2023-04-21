@@ -53,6 +53,7 @@ class neighborhood_il:
         self.infinite_neighbor_buffer = config.infinite_neighbor_buffer
         self.bc_pretraining = config.bc_pretraining
         self.hybrid = config.hybrid
+        self.use_relative_reward = config.use_relative_reward
         self.total_steps = 0
         if self.hard_negative_sampling:
             print("hard negative sampling")
@@ -151,6 +152,7 @@ class neighborhood_il:
                 .view((-1, 1))
                 .to(device)
             )
+        self.expert_reward_ones = torch.ones(self.batch_size).view((-1, 1)).to(device)
 
     def start(self, agent, env, storage, util_dict):
         if self.oracle_neighbor:
@@ -379,6 +381,7 @@ class neighborhood_il:
                     if not self.use_target_neighbor
                     else self.TargetNeighborhoodNet,
                     self.expert_ns_data,
+                    self.expert_reward_ones,
                     self.margin_value,
                     self.bc_only,
                     self.no_bc,
@@ -387,6 +390,7 @@ class neighborhood_il:
                     self.policy_threshold_ratio,
                     self.use_env_done,
                     self.no_update_alpha,
+                    self.use_relative_reward,
                 )
                 self.total_steps += 1
             agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
