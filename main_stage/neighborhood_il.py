@@ -531,7 +531,7 @@ class neighborhood_il:
             self.TargetNeighborhoodNet.parameters(), self.NeighborhoodNet.parameters()
         ):
             target_param.data.copy_(
-                target_param.data * (1.0 - self.self.neighborhood_tau) + param.data * self.self.neighborhood_tau
+                target_param.data * (1.0 - self.neighborhood_tau) + param.data * self.neighborhood_tau
             )
 
 
