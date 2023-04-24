@@ -38,6 +38,8 @@ alpha_lr:
   0.0003
 tau:
   0.0001
+neighborhood_tau:
+  0.005
 neighbor_model_alpha:
   0.99
 episodes:
