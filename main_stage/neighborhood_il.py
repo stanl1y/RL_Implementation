@@ -48,6 +48,7 @@ class neighborhood_il:
         self.use_env_done = config.use_env_done
         self.use_target_neighbor = config.use_target_neighbor
         self.tau = config.tau
+        self.neighborhood_tau = config.neighborhood_tau
         self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
         self.no_update_alpha = config.no_update_alpha
         self.infinite_neighbor_buffer = config.infinite_neighbor_buffer
@@ -530,7 +531,7 @@ class neighborhood_il:
             self.TargetNeighborhoodNet.parameters(), self.NeighborhoodNet.parameters()
         ):
             target_param.data.copy_(
-                target_param.data * (1.0 - self.tau) + param.data * self.tau
+                target_param.data * (1.0 - self.self.neighborhood_tau) + param.data * self.self.neighborhood_tau
             )
 
 

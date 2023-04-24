@@ -125,6 +125,9 @@ def get_config():
         "--log_alpha_init", type=float, help="initial value of log_alpha"
     )
     parser.add_argument(
+        "--tau", type=float, help="tau for soft update of target network"
+    )
+    parser.add_argument(
         "--neighborhood_tau", type=float, help="tau for soft update of target neighborhood network"
     )
     parser.add_argument(
