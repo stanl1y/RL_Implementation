@@ -114,3 +114,7 @@ use_relative_reward:
   False
 state_only:
   False
+critic_without_entropy:
+  False
+target_entropy_weight:
+  1

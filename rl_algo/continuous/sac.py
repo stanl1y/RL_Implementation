@@ -31,6 +31,7 @@ class sac(base_agent):
         batch_size=256,
         use_ounoise=False,
         log_alpha_init=0,
+        target_entropy_weight=1.0,
     ):
 
         super().__init__(
@@ -84,7 +85,9 @@ class sac(base_agent):
         else:
             return mu[0].cpu().numpy()
 
-    def update_critic(self, state, action, reward, next_state, done):
+    def update_critic(
+        self, state, action, reward, next_state, done, without_entropy=False
+    ):
 
         """compute target value"""
         with torch.no_grad():
@@ -94,7 +97,9 @@ class sac(base_agent):
                 for critic_target in self.critic_target
             ]
             target_value = reward + self.gamma * (1 - done) * (
-                torch.min(target_q_val[0], target_q_val[1]) - self.alpha * next_log_prob
+                torch.min(target_q_val[0], target_q_val[1]) + 0
+                if without_entropy
+                else -self.alpha * next_log_prob
             )
 
         """compute loss and update"""
@@ -110,7 +115,14 @@ class sac(base_agent):
             "critic1_loss": critic_loss[1],
         }
 
-    def update_actor(self, state, reward=None, threshold=None, no_update_alpha=False):
+    def update_actor(
+        self,
+        state,
+        reward=None,
+        threshold=None,
+        no_update_alpha=False,
+        target_entropy_weight=1.0,
+    ):
         if threshold != None:
             state_idx = torch.argwhere(reward.reshape(-1) < threshold).reshape(-1)
             policy_state = state[state_idx]
@@ -135,7 +147,8 @@ class sac(base_agent):
             if not no_update_alpha:
                 """update alpha"""
                 alpha_loss = (
-                    self.alpha * (-log_prob - self.target_entropy).detach()
+                    self.alpha
+                    * (-log_prob - target_entropy_weight * self.target_entropy).detach()
                 ).mean()
                 self.log_alpha_optimizer.zero_grad()
                 alpha_loss.backward()
@@ -211,7 +224,7 @@ class sac(base_agent):
         """
         cartesian_product_state = torch.cat(
             (
-                torch.repeat_interleave(next_state, explore_step+2, dim=0),
+                torch.repeat_interleave(next_state, explore_step + 2, dim=0),
                 expert_ns_data[state_idx].reshape((-1, expert_ns_data.shape[-1])),
             ),
             dim=1,
@@ -470,6 +483,8 @@ class sac(base_agent):
         no_update_alpha=False,
         use_relative_reward=False,
         state_only=False,
+        critic_without_entropy=False,
+        target_entropy_weight=1.0,
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -534,22 +549,24 @@ class sac(base_agent):
                 # reward=reward,
                 # threshold=expert_reward_mean * policy_threshold_ratio,
                 no_update_alpha=no_update_alpha,
+                target_entropy_weight=target_entropy_weight,
             )
-            # expert_actor_loss = self.update_actor( 
+            # expert_actor_loss = self.update_actor(
             #     expert_state,
             #     no_update_alpha=no_update_alpha,
             # )
         # print("update actor time", time.time() - t)
         # t = time.time()
         if use_relative_reward:
-            ralative_reward=reward/(expert_reward_mean+1e-6)
-            relative_expert_reward=expert_reward_ones
+            ralative_reward = reward / (expert_reward_mean + 1e-6)
+            relative_expert_reward = expert_reward_ones
         critic_loss = self.update_critic(
             state,
             action,
             ralative_reward if use_relative_reward else reward,
             next_state,
             done,
+            without_entropy=critic_without_entropy,
         )
         # print("update critic time", time.time() - t)
         # t = time.time()
@@ -560,13 +577,15 @@ class sac(base_agent):
                 relative_expert_reward if use_relative_reward else expert_reward,
                 expert_next_state,
                 expert_done,
+                without_entropy=critic_without_entropy,
             )
             expert_keys = {
                 "expert_critic0_loss": "critic0_loss",
                 "expert_critic1_loss": "critic1_loss",
             }
             expert_critic_loss = dict(
-                (key, expert_critic_loss[expert_keys[key]]) for key in expert_keys.keys()
+                (key, expert_critic_loss[expert_keys[key]])
+                for key in expert_keys.keys()
             )
         else:
             expert_critic_loss = {}
@@ -577,7 +596,9 @@ class sac(base_agent):
             "sampled_agent_reward_mean": reward.mean().item(),
         }
         if use_relative_reward:
-            reward_dict["sampled_agent_relative_reward_mean"]=ralative_reward.mean().item()
+            reward_dict[
+                "sampled_agent_relative_reward_mean"
+            ] = ralative_reward.mean().item()
         if no_bc or state_only:
             bc_loss = 0
         else:
@@ -586,7 +607,13 @@ class sac(base_agent):
         # t = time.time()
         self.soft_update_target()
         # print("end update_using_neighborhood_reward")
-        return {**actor_loss, **critic_loss, **expert_critic_loss, **reward_dict, "bc_loss": bc_loss}
+        return {
+            **actor_loss,
+            **critic_loss,
+            **expert_critic_loss,
+            **reward_dict,
+            "bc_loss": bc_loss,
+        }
 
     def cache_weight(self):
         self.best_actor.load_state_dict(self.actor.state_dict())
@@ -602,14 +629,22 @@ class sac(base_agent):
         )
 
     def save_weight(
-        self, best_testing_reward, algo, env_id, episodes, log_name="", delete_prev_weight=True, oracle_reward=True
+        self,
+        best_testing_reward,
+        algo,
+        env_id,
+        episodes,
+        log_name="",
+        delete_prev_weight=True,
+        oracle_reward=True,
     ):
         dir_path = f"./trained_model/{algo}/{env_id}/"
         if not os.path.isdir(dir_path):
             os.makedirs(dir_path)
 
         file_path = os.path.join(
-            dir_path, f"episode{episodes}_reward{round(best_testing_reward,3)}{log_name}.pt"
+            dir_path,
+            f"episode{episodes}_reward{round(best_testing_reward,3)}{log_name}.pt",
         )
 
         if file_path == self.previous_checkpoint_path:

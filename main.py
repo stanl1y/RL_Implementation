@@ -122,6 +122,16 @@ def get_config():
         help="neighborhood il without using expert action",
     )
     parser.add_argument(
+        "--critic_without_entropy",
+        action="store_true",
+        help="exclude entropy term in target value of critic",
+    )
+    parser.add_argument(
+        "--target_entropy_weight",
+        type=float,
+        help="target entropy weight for sac",
+    )
+    parser.add_argument(
         "--entropy_loss_weight_decay_rate",
         type=float,
         help="decay rate of entropy loss weight",

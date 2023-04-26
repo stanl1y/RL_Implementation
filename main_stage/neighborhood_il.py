@@ -57,6 +57,8 @@ class neighborhood_il:
         self.use_relative_reward = config.use_relative_reward
         self.state_only = config.state_only
         self.total_steps = 0
+        self.critic_without_entropy = config.critic_without_entropy
+        self.target_entropy_weight = config.target_entropy_weight
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -394,6 +396,8 @@ class neighborhood_il:
                     self.no_update_alpha,
                     self.use_relative_reward,
                     self.state_only,
+                    self.critic_without_entropy,
+                    self.target_entropy_weight,
                 )
                 self.total_steps += 1
             agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
