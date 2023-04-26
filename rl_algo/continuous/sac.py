@@ -469,6 +469,7 @@ class sac(base_agent):
         use_env_done=False,
         no_update_alpha=False,
         use_relative_reward=False,
+        state_only=False,
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -552,29 +553,32 @@ class sac(base_agent):
         )
         # print("update critic time", time.time() - t)
         # t = time.time()
-        expert_critic_loss = self.update_critic(
-            expert_state,
-            expert_action,
-            relative_expert_reward if use_relative_reward else expert_reward,
-            expert_next_state,
-            expert_done,
-        )
+        if not state_only:
+            expert_critic_loss = self.update_critic(
+                expert_state,
+                expert_action,
+                relative_expert_reward if use_relative_reward else expert_reward,
+                expert_next_state,
+                expert_done,
+            )
+            expert_keys = {
+                "expert_critic0_loss": "critic0_loss",
+                "expert_critic1_loss": "critic1_loss",
+            }
+            expert_critic_loss = dict(
+                (key, expert_critic_loss[expert_keys[key]]) for key in expert_keys.keys()
+            )
+        else:
+            expert_critic_loss = {}
         # print("update expert critic time", time.time() - t)
         # t = time.time()
-        expert_keys = {
-            "expert_critic0_loss": "critic0_loss",
-            "expert_critic1_loss": "critic1_loss",
-        }
-        tmp = dict(
-            (key, expert_critic_loss[expert_keys[key]]) for key in expert_keys.keys()
-        )
         reward_dict = {
             "sampled_expert_reward_mean": expert_reward_mean,
             "sampled_agent_reward_mean": reward.mean().item(),
         }
         if use_relative_reward:
             reward_dict["sampled_agent_relative_reward_mean"]=ralative_reward.mean().item()
-        if no_bc:
+        if no_bc or state_only:
             bc_loss = 0
         else:
             bc_loss = self.bc_update(expert_state, expert_action)
@@ -582,7 +586,7 @@ class sac(base_agent):
         # t = time.time()
         self.soft_update_target()
         # print("end update_using_neighborhood_reward")
-        return {**actor_loss, **critic_loss, **tmp, **reward_dict, "bc_loss": bc_loss}
+        return {**actor_loss, **critic_loss, **expert_critic_loss, **reward_dict, "bc_loss": bc_loss}
 
     def cache_weight(self):
         self.best_actor.load_state_dict(self.actor.state_dict())

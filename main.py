@@ -117,6 +117,11 @@ def get_config():
         help="set state in neighborhood il",
     )
     parser.add_argument(
+        "--state_only",
+        action="store_true",
+        help="neighborhood il without using expert action",
+    )
+    parser.add_argument(
         "--entropy_loss_weight_decay_rate",
         type=float,
         help="decay rate of entropy loss weight",

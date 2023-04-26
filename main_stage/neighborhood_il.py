@@ -55,6 +55,7 @@ class neighborhood_il:
         self.bc_pretraining = config.bc_pretraining
         self.hybrid = config.hybrid
         self.use_relative_reward = config.use_relative_reward
+        self.state_only = config.state_only
         self.total_steps = 0
         if self.hard_negative_sampling:
             print("hard negative sampling")
@@ -311,7 +312,7 @@ class neighborhood_il:
         }
 
     def train(self, agent, env, storage):
-        if self.bc_pretraining:
+        if self.bc_pretraining and not self.state_only:
             (expert_state, expert_action, _, _, _, _,) = storage.sample(
                 self.batch_size,
                 expert=True,
@@ -392,6 +393,7 @@ class neighborhood_il:
                     self.use_env_done,
                     self.no_update_alpha,
                     self.use_relative_reward,
+                    self.state_only,
                 )
                 self.total_steps += 1
             agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate

@@ -112,3 +112,5 @@ hybrid:
   False
 use_relative_reward:
   False
+state_only:
+  False
