@@ -31,7 +31,6 @@ class sac(base_agent):
         batch_size=256,
         use_ounoise=False,
         log_alpha_init=0,
-        target_entropy_weight=1.0,
     ):
 
         super().__init__(
@@ -485,6 +484,7 @@ class sac(base_agent):
         state_only=False,
         critic_without_entropy=False,
         target_entropy_weight=1.0,
+        reward_scaling_weight=1.0,
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -558,12 +558,14 @@ class sac(base_agent):
         # print("update actor time", time.time() - t)
         # t = time.time()
         if use_relative_reward:
-            ralative_reward = reward / (expert_reward_mean + 1e-6)
+            relative_reward = reward / (expert_reward_mean + 1e-6)
             relative_expert_reward = expert_reward_ones
+            relative_reward *= reward_scaling_weight
+            relative_expert_reward *= reward_scaling_weight
         critic_loss = self.update_critic(
             state,
             action,
-            ralative_reward if use_relative_reward else reward,
+            relative_reward if use_relative_reward else reward,
             next_state,
             done,
             without_entropy=critic_without_entropy,
@@ -598,7 +600,7 @@ class sac(base_agent):
         if use_relative_reward:
             reward_dict[
                 "sampled_agent_relative_reward_mean"
-            ] = ralative_reward.mean().item()
+            ] = relative_reward.mean().item()
         if no_bc or state_only:
             bc_loss = 0
         else:

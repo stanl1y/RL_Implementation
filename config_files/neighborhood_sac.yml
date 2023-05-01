@@ -118,3 +118,5 @@ critic_without_entropy:
   False
 target_entropy_weight:
   1
+reward_scaling_weight:
+  1.0
