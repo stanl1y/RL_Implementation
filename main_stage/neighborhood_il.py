@@ -340,6 +340,8 @@ class neighborhood_il:
                     done = False
                 else:
                     state = next_state
+        for _ in range(1000):
+            neighbor_loss = self.update_neighbor_model(storage)
         self.best_testing_reward = -1e7
         self.best_testing_neighborhood_reward = -1e7
         best_episode = 0
