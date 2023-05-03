@@ -158,7 +158,7 @@ class neighborhood_il:
                 .to(device)
             )
         self.expert_reward_ones = (
-            torch.ones(self.batch_size).view((-1, 1)) * self.expert_reward_weight
+            torch.ones(self.batch_size).view((-1, 1)) * self.reward_scaling_weight
         )
         self.expert_reward_ones = self.expert_reward_ones.to(device)
 
