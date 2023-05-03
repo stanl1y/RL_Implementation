@@ -157,8 +157,8 @@ class neighborhood_il:
                 .view((-1, 1))
                 .to(device)
             )
-        self.expert_reward_ones = (
-            torch.ones(self.batch_size).view((-1, 1)) * self.reward_scaling_weight
+        self.expert_reward_ones = torch.FloatTensor(
+            np.ones(self.batch_size).reshape((-1, 1)) * self.reward_scaling_weight
         )
         self.expert_reward_ones = self.expert_reward_ones.to(device)
 
