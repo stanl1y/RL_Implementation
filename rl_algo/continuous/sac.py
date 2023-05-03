@@ -561,7 +561,7 @@ class sac(base_agent):
             relative_reward = reward / (expert_reward_mean + 1e-6)
             relative_expert_reward = expert_reward_ones
             relative_reward *= reward_scaling_weight
-            # relative_expert_reward *= reward_scaling_weight
+            relative_expert_reward *= reward_scaling_weight
         critic_loss = self.update_critic(
             state,
             action,

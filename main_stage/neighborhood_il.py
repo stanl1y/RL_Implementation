@@ -157,7 +157,10 @@ class neighborhood_il:
                 .view((-1, 1))
                 .to(device)
             )
-        self.expert_reward_ones = torch.ones(self.batch_size).view((-1, 1)).to(device)
+        self.expert_reward_ones = (
+            torch.ones(self.batch_size).view((-1, 1)) * self.expert_reward_weight
+        )
+        self.expert_reward_ones = self.expert_reward_ones.to(device)
 
     def start(self, agent, env, storage, util_dict):
         if self.oracle_neighbor:
@@ -401,7 +404,7 @@ class neighborhood_il:
                     self.state_only,
                     self.critic_without_entropy,
                     self.target_entropy_weight,
-                    self.reward_scaling_weight
+                    self.reward_scaling_weight,
                 )
                 self.total_steps += 1
             agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
@@ -541,7 +544,8 @@ class neighborhood_il:
             self.TargetNeighborhoodNet.parameters(), self.NeighborhoodNet.parameters()
         ):
             target_param.data.copy_(
-                target_param.data * (1.0 - self.neighborhood_tau) + param.data * self.neighborhood_tau
+                target_param.data * (1.0 - self.neighborhood_tau)
+                + param.data * self.neighborhood_tau
             )
 
 
