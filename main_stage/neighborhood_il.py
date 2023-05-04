@@ -140,7 +140,7 @@ class neighborhood_il:
                     (
                         torch.ones(self.batch_size) * self.neighbor_model_alpha,
                         torch.ones(self.batch_size) * (1 - self.neighbor_model_alpha),
-                        torch.ones(self.batch_size),
+                        torch.ones(self.batch_size) * (1 - self.neighbor_model_alpha),
                     )
                 )
                 .view((-1, 1))
