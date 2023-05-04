@@ -485,6 +485,7 @@ class sac(base_agent):
         critic_without_entropy=False,
         target_entropy_weight=1.0,
         reward_scaling_weight=1.0,
+        use_true_expert_relative_reward=False,
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -559,8 +560,12 @@ class sac(base_agent):
         # t = time.time()
         if use_relative_reward:
             relative_reward = reward / (expert_reward_mean + 1e-6)
-            relative_expert_reward = expert_reward_ones
             relative_reward *= reward_scaling_weight
+            if use_true_expert_relative_reward:
+                relative_expert_reward = expert_reward / (expert_reward_mean + 1e-6)
+                relative_expert_reward *= reward_scaling_weight
+            else:
+                relative_expert_reward = expert_reward_ones
             # relative_expert_reward *= reward_scaling_weight
         critic_loss = self.update_critic(
             state,

@@ -60,6 +60,7 @@ class neighborhood_il:
         self.critic_without_entropy = config.critic_without_entropy
         self.target_entropy_weight = config.target_entropy_weight
         self.reward_scaling_weight = config.reward_scaling_weight
+        self.use_true_expert_relative_reward = config.use_true_expert_relative_reward
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -405,6 +406,7 @@ class neighborhood_il:
                     self.critic_without_entropy,
                     self.target_entropy_weight,
                     self.reward_scaling_weight,
+                    self.use_true_expert_relative_reward,
                 )
                 self.total_steps += 1
             agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate

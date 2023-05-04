@@ -127,6 +127,11 @@ def get_config():
         help="exclude entropy term in target value of critic",
     )
     parser.add_argument(
+        "--use_true_expert_relative_reward",
+        action="store_true",
+        help="use true expert relative reward or pure ones",
+    )
+    parser.add_argument(
         "--target_entropy_weight",
         type=float,
         help="target entropy weight for sac",
