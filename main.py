@@ -132,6 +132,11 @@ def get_config():
         help="use true expert relative reward or pure ones",
     )
     parser.add_argument(
+        "--low_hard_negative_weight",
+        action="store_true",
+        help="weight of hard negative times (1-alpha)",
+    )
+    parser.add_argument(
         "--target_entropy_weight",
         type=float,
         help="target entropy weight for sac",

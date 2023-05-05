@@ -122,3 +122,5 @@ reward_scaling_weight:
   1.0
 use_true_expert_relative_reward:
   False
+low_hard_negative_weight:
+  False

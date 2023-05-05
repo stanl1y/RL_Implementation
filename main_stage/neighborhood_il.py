@@ -61,6 +61,7 @@ class neighborhood_il:
         self.target_entropy_weight = config.target_entropy_weight
         self.reward_scaling_weight = config.reward_scaling_weight
         self.use_true_expert_relative_reward = config.use_true_expert_relative_reward
+        self.low_hard_negative_weight = config.low_hard_negative_weight
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -141,7 +142,10 @@ class neighborhood_il:
                     (
                         torch.ones(self.batch_size) * self.neighbor_model_alpha,
                         torch.ones(self.batch_size) * (1 - self.neighbor_model_alpha),
-                        torch.ones(self.batch_size),
+                        torch.ones(self.batch_size)
+                        * (1 - self.low_hard_negative_weight)
+                        if self.low_hard_negative_weight
+                        else 1,
                     )
                 )
                 .view((-1, 1))
