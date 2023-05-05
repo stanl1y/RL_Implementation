@@ -143,9 +143,9 @@ class neighborhood_il:
                         torch.ones(self.batch_size) * self.neighbor_model_alpha,
                         torch.ones(self.batch_size) * (1 - self.neighbor_model_alpha),
                         torch.ones(self.batch_size)
-                        * (1 - self.low_hard_negative_weight)
+                        * ((1 - self.low_hard_negative_weight)
                         if self.low_hard_negative_weight
-                        else 1,
+                        else 1.0),
                     )
                 )
                 .view((-1, 1))
