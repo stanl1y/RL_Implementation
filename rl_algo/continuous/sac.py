@@ -380,6 +380,7 @@ class sac(base_agent):
         next_state,
         oracle_neighbor,
         discretize_reward=False,
+        use_top_k=False,
     ):
 
         """construct a tensor that looks like
@@ -416,7 +417,10 @@ class sac(base_agent):
         if discretize_reward:
             prob[prob > 0.5] = 0.5
             prob[prob <= 0.5] = 0
-        reward = prob.reshape((len(next_state), -1)).sum(axis=1, keepdims=True)
+        reward = prob.reshape((len(next_state), -1))
+        if use_top_k:
+            reward = reward.topk(10, dim=1, sorted=False)[0]
+        reward = reward.sum(axis=1, keepdims=True)
         # print("reshape time", time.time() - t)
         # print("end neighborhood reward")
         return reward
@@ -486,6 +490,7 @@ class sac(base_agent):
         target_entropy_weight=1.0,
         reward_scaling_weight=1.0,
         use_true_expert_relative_reward=False,
+        use_top_k=False,
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -510,6 +515,7 @@ class sac(base_agent):
             next_state,
             oracle_neighbor,
             discretize_reward,
+            use_top_k=use_top_k,
         )
         # print("neighborhood reward time", time.time() - t)
         # t = time.time()
@@ -534,6 +540,7 @@ class sac(base_agent):
             expert_next_state,
             oracle_neighbor,
             discretize_reward,
+            use_top_k=use_top_k,
         )
         # print("expert neighborhood reward time", time.time() - t)
         # t = time.time()
