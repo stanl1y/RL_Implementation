@@ -63,6 +63,8 @@ class neighborhood_il:
         self.use_true_expert_relative_reward = config.use_true_expert_relative_reward
         self.low_hard_negative_weight = config.low_hard_negative_weight
         self.use_top_k= config.use_top_k
+        self.use_pretrained_neighbor = config.use_pretrained_neighbor
+        self.pretrained_neighbor_weight_path = config.pretrained_neighbor_weight_path
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -173,6 +175,11 @@ class neighborhood_il:
             self.NeighborhoodNet = util_dict["OracleNeighborhoodNet"].to(device)
         else:
             self.NeighborhoodNet = util_dict["NeighborhoodNet"].to(device)
+            if self.use_pretrained_neighbor:
+                self.NeighborhoodNet.load_state_dict(
+                    torch.load(self.pretrained_weight_path)["neighborhood_state_dict"]
+                )
+                print(f"load pretrained neighbor model from {self.pretrained_weight_path}")
             self.NeighborhoodNet_optimizer = torch.optim.Adam(
                 self.NeighborhoodNet.parameters(), lr=3e-4
             )
@@ -349,8 +356,9 @@ class neighborhood_il:
                     done = False
                 else:
                     state = next_state
-        for _ in range(1000):
-            neighbor_loss = self.update_neighbor_model(storage)
+        if not self.use_pretrained_neighbor:
+            for _ in range(1000):
+                neighbor_loss = self.update_neighbor_model(storage)
         self.best_testing_reward = -1e7
         self.best_testing_neighborhood_reward = -1e7
         best_episode = 0
@@ -361,6 +369,7 @@ class neighborhood_il:
                 and episode % self.update_neighbor_frequency == 0
                 and episode <= self.update_neighbor_until
                 and not self.use_target_neighbor
+                and not self.use_pretrained_neighbor
             ):
                 for _ in range(self.update_neighbor_step):
                     neighbor_loss = self.update_neighbor_model(storage)
@@ -389,7 +398,8 @@ class neighborhood_il:
                 total_reward += reward
                 storage.store(state, action, reward, next_state, done)
                 state = next_state
-                if self.use_target_neighbor:
+                neighbor_loss = 0
+                if self.use_target_neighbor and not self.use_pretrained_neighbor:
                     neighbor_loss = self.update_neighbor_model(storage)
                 loss_info = agent.update_using_neighborhood_reward(
                     storage,

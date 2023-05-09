@@ -142,6 +142,14 @@ def get_config():
         help="usetop k reward in neighborhood il",
     )
     parser.add_argument(
+        "--use_pretrained_neighbor",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--pretrained_neighbor_weight_path",
+        type=str,
+    )
+    parser.add_argument(
         "--target_entropy_weight",
         type=float,
         help="target entropy weight for sac",
@@ -187,7 +195,6 @@ def get_config():
     parser.add_argument(
         "--explore_step", type=int, help="number of step of exploration in set_state_il"
     )
-
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 

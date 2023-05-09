@@ -126,3 +126,7 @@ low_hard_negative_weight:
   False
 use_top_k:
   False
+use_pretrained_neighbor:
+  False
+pretrained_neighbor_weight_path:
+  ""
