@@ -177,9 +177,9 @@ class neighborhood_il:
             self.NeighborhoodNet = util_dict["NeighborhoodNet"].to(device)
             if self.use_pretrained_neighbor:
                 self.NeighborhoodNet.load_state_dict(
-                    torch.load(self.pretrained_weight_path)["neighborhood_state_dict"]
+                    torch.load(self.pretrained_neighbor_weight_path)["neighborhood_state_dict"]
                 )
-                print(f"load pretrained neighbor model from {self.pretrained_weight_path}")
+                print(f"load pretrained neighbor model from {self.pretrained_neighbor_weight_path}")
             self.NeighborhoodNet_optimizer = torch.optim.Adam(
                 self.NeighborhoodNet.parameters(), lr=3e-4
             )
