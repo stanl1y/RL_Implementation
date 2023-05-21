@@ -348,7 +348,7 @@ class neighborhood_il:
                 storage.store(state, action, reward, next_state, done)
                 state = next_state
                 if self.use_target_neighbor:
-                    neighbor_loss = self.update_neighbor_model(storage)
+                    neighbor_info = self.update_neighbor_model(storage)
                 loss_info = agent.update_using_neighborhood_reward(
                     storage,
                     self.NeighborhoodNet
@@ -373,7 +373,7 @@ class neighborhood_il:
                     "buffer_size": len(storage),
                     "threshold_ratio": self.policy_threshold_ratio,
                     **loss_info,
-                    "neighbor_model_loss": neighbor_loss,
+                    **neighbor_info,
                     "entropy_loss_weight": agent.entropy_loss_weight,
                     "total_steps": self.total_steps,
                 }
@@ -495,7 +495,25 @@ class neighborhood_il:
         self.NeighborhoodNet_optimizer.step()
         if self.use_target_neighbor:
             self.update_target_neighbor_model()
-        return loss.item()
+        # calculate accuracy
+        prediction = prediction > 0.5
+        result = prediction == self.update_neighor_label
+        positive_accuracy = torch.sum(result[: len(posivite_data)]) / len(posivite_data)
+        if not self.hard_negative_sampling:
+            easy_negative_accuracy = torch.sum(result[len(posivite_data) :]) / len(
+                negative_data
+            )
+        else:
+            easy_negative_accuracy = torch.sum(
+                result[len(posivite_data) : -len(negative_hard_data)]
+            ) / len(negative_data)
+            hard_negative_accuracy = torch.sum(
+                result[-len(negative_hard_data) :]
+            ) / len(negative_hard_data)
+        return {"neighbor_model_loss":loss.item(),
+                "neighbor_model_positive_accuracy":positive_accuracy.item(),
+                "neighbor_model_easy_negative_accuracy":easy_negative_accuracy.item(),
+                "neighbor_model_hard_negative_accuracy":hard_negative_accuracy.item() if self.hard_negative_sampling else 0,}
 
     def update_target_neighbor_model(self):
         for target_param, param in zip(
