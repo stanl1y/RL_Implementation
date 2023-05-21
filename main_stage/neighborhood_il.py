@@ -503,6 +503,14 @@ class neighborhood_il:
             easy_negative_accuracy = torch.sum(result[len(posivite_data) :]) / len(
                 negative_data
             )
+            with torch.no_grad():
+                negative_hard_data = torch.cat((next_state, state), axis=1)
+                negative_hard_data = negative_hard_data.to(device)
+                prediction = self.NeighborhoodNet(negative_hard_data)
+                prediction = prediction > 0.5
+                result = (prediction == False)
+                hard_negative_accuracy = torch.sum(result) / len(negative_hard_data)
+
         else:
             easy_negative_accuracy = torch.sum(
                 result[len(posivite_data) : -len(negative_hard_data)]
@@ -510,10 +518,12 @@ class neighborhood_il:
             hard_negative_accuracy = torch.sum(
                 result[-len(negative_hard_data) :]
             ) / len(negative_hard_data)
-        return {"neighbor_model_loss":loss.item(),
-                "neighbor_model_positive_accuracy":positive_accuracy.item(),
-                "neighbor_model_easy_negative_accuracy":easy_negative_accuracy.item(),
-                "neighbor_model_hard_negative_accuracy":hard_negative_accuracy.item() if self.hard_negative_sampling else 0,}
+        return {
+            "neighbor_model_loss": loss.item(),
+            "neighbor_model_positive_accuracy": positive_accuracy.item(),
+            "neighbor_model_easy_negative_accuracy": easy_negative_accuracy.item(),
+            "neighbor_model_hard_negative_accuracy": hard_negative_accuracy.item()
+        }
 
     def update_target_neighbor_model(self):
         for target_param, param in zip(
