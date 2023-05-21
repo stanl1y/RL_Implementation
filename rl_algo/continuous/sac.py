@@ -560,8 +560,8 @@ class sac(base_agent):
             (key, expert_critic_loss[expert_keys[key]]) for key in expert_keys.keys()
         )
         reward_dict = {
-            "expert_reward_mean": expert_reward_mean,
-            "sampled_exp_reward_mean": reward.mean().item(),
+            "sampled_expert_reward_mean": expert_reward_mean,
+            "sampled_agent_reward_mean": reward.mean().item(),
         }
         if no_bc:
             bc_loss = 0
