@@ -78,13 +78,13 @@ The expert data is stored in the folder `saved_expert_transition/`. The expert d
         --no_update_alpha --log_alpha_init -0.6
         ```
 
-### Run without BC loss
+### Run without the BC loss
 Add the following flag:
 ```
 --no_bc
 ```
 
-### Run without hard negative sampling
+### Run without hard negative samples
 Add the following flag:
 ```
 --no_hard_negative_sampling
