@@ -4,6 +4,9 @@
   <h1 align="center">TDIL (Imitation Learning via Transition Discriminator)</h1>
 </div>
 
+## Introduction of this project
+In the realm of imitation learning (IL), a particularly challenging but practical paradigm is the single-demonstration IL, where only a single demonstration is available to the learner. This situation holds practical relevance in real-world scenarios such as autonomous vehicle training, where repeated demonstrations, continuous human supervision, or reward function formulation can be strenuous and expensive. This study introduces a novel algorithm specifically tailored for this setting. We propose a transition discriminator to estimate the one-step transition probability, serving as an indicator of the likelihood of reaching the expert states. Our transition discriminator, unlike conventional discriminators, processes pairs of agent and expert states, generating reward signals that guide a reinforcement learning (RL) agent towards the immediate vicinity of expert states. The method demonstrates significant correlation with inaccessible ground truth reward signals, and offers a practical solution for blind model selection. We validate our proposed methodology through comprehensive experiments on five challenging MuJoCo benchmarks, in which the proposed methodology delivers exceptional performance, matching expert-level results and outperforming the existing baseline algorithms.
+
 ## Preparation
 * This project can be executed with Python 3.7.7.
 * Install the required packages by running the following command:
