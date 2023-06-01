@@ -96,9 +96,9 @@ class sac(base_agent):
                 for critic_target in self.critic_target
             ]
             target_value = reward + self.gamma * (1 - done) * (
-                torch.min(target_q_val[0], target_q_val[1]) + 0
+                torch.min(target_q_val[0], target_q_val[1]) + (0
                 if without_entropy
-                else -self.alpha * next_log_prob
+                else -self.alpha * next_log_prob)
             )
 
         """compute loss and update"""

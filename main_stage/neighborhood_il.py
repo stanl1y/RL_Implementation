@@ -462,6 +462,7 @@ class neighborhood_il:
                     {
                         **testing_reward,
                         "testing_episode_num": episode,
+                        "testing_total_steps": self.total_steps,
                         "best_testing_reward": self.best_testing_reward,
                         "best_testing_neighborhood_reward": self.best_testing_neighborhood_reward,
                     }
