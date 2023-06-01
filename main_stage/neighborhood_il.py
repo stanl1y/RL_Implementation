@@ -356,9 +356,6 @@ class neighborhood_il:
                     done = False
                 else:
                     state = next_state
-        if not self.use_pretrained_neighbor:
-            for _ in range(1000):
-                neighbor_loss = self.update_neighbor_model(storage)
         self.best_testing_reward = -1e7
         self.best_testing_neighborhood_reward = -1e7
         best_episode = 0
@@ -398,9 +395,9 @@ class neighborhood_il:
                 total_reward += reward
                 storage.store(state, action, reward, next_state, done)
                 state = next_state
-                neighbor_loss = 0
+                neighbor_info = {}
                 if self.use_target_neighbor and not self.use_pretrained_neighbor:
-                    neighbor_loss = self.update_neighbor_model(storage)
+                    neighbor_info = self.update_neighbor_model(storage)
                 loss_info = agent.update_using_neighborhood_reward(
                     storage,
                     self.NeighborhoodNet
@@ -433,7 +430,7 @@ class neighborhood_il:
                     "buffer_size": len(storage),
                     "threshold_ratio": self.policy_threshold_ratio,
                     **loss_info,
-                    "neighbor_model_loss": neighbor_loss,
+                    **neighbor_info,
                     "entropy_loss_weight": agent.entropy_loss_weight,
                     "total_steps": self.total_steps,
                 }
@@ -556,7 +553,35 @@ class neighborhood_il:
         self.NeighborhoodNet_optimizer.step()
         if self.use_target_neighbor:
             self.update_target_neighbor_model()
-        return loss.item()
+        # calculate accuracy
+        prediction = prediction > 0.5
+        result = prediction == self.update_neighor_label
+        positive_accuracy = torch.sum(result[: len(posivite_data)]) / len(posivite_data)
+        if not self.hard_negative_sampling:
+            easy_negative_accuracy = torch.sum(result[len(posivite_data) :]) / len(
+                negative_data
+            )
+            with torch.no_grad():
+                negative_hard_data = torch.cat((next_state, state), axis=1)
+                negative_hard_data = negative_hard_data.to(device)
+                prediction = self.NeighborhoodNet(negative_hard_data)
+                prediction = prediction > 0.5
+                result = (prediction == False)
+                hard_negative_accuracy = torch.sum(result) / len(negative_hard_data)
+
+        else:
+            easy_negative_accuracy = torch.sum(
+                result[len(posivite_data) : -len(negative_hard_data)]
+            ) / len(negative_data)
+            hard_negative_accuracy = torch.sum(
+                result[-len(negative_hard_data) :]
+            ) / len(negative_hard_data)
+        return {
+            "neighbor_model_loss": loss.item(),
+            "neighbor_model_positive_accuracy": positive_accuracy.item(),
+            "neighbor_model_easy_negative_accuracy": easy_negative_accuracy.item(),
+            "neighbor_model_hard_negative_accuracy": hard_negative_accuracy.item()
+        }
 
     def update_target_neighbor_model(self):
         for target_param, param in zip(
