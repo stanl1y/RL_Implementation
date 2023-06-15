@@ -62,9 +62,10 @@ class neighborhood_il:
         self.reward_scaling_weight = config.reward_scaling_weight
         self.use_true_expert_relative_reward = config.use_true_expert_relative_reward
         self.low_hard_negative_weight = config.low_hard_negative_weight
-        self.use_top_k= config.use_top_k
+        self.use_top_k = config.use_top_k
         self.use_pretrained_neighbor = config.use_pretrained_neighbor
         self.pretrained_neighbor_weight_path = config.pretrained_neighbor_weight_path
+        self.expert_sub_sample_ratio = config.expert_sub_sample_ratio
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -97,7 +98,7 @@ class neighborhood_il:
                 torch.tile(expert_next_state, (1000, 1)).to(device).to(device)
             )
             self.testing_expert_ns_data0 = torch.repeat_interleave(
-                expert_next_state, 1000, dim=0
+                expert_next_state, self.expert_data_num, dim=0
             ).to(device)
         else:
             self.expert_ns_data = np.tile(expert_next_state, (self.batch_size, 1))
@@ -107,14 +108,13 @@ class neighborhood_il:
                 self.testing_expert_ns_data
             ).to(device)
             self.testing_expert_ns_data0 = torch.FloatTensor(
-                np.repeat(expert_next_state, 1000, axis=0)
+                np.repeat(expert_next_state, self.expert_data_num, axis=0)
             ).to(device)
-
         self.expert_cartesian_product_state = torch.cat(
             (
                 self.testing_expert_ns_data0,
                 # in mujoco, 1000 is the number of expert states
-                self.testing_expert_ns_data.reshape(
+                self.testing_expert_ns_data[: len(self.testing_expert_ns_data0)].reshape(
                     (-1, self.testing_expert_ns_data.shape[-1])
                 ),
             ),
@@ -146,9 +146,11 @@ class neighborhood_il:
                         torch.ones(self.batch_size) * self.neighbor_model_alpha,
                         torch.ones(self.batch_size) * (1 - self.neighbor_model_alpha),
                         torch.ones(self.batch_size)
-                        * ((1 - self.neighbor_model_alpha)
-                        if self.low_hard_negative_weight
-                        else 1.0),
+                        * (
+                            (1 - self.neighbor_model_alpha)
+                            if self.low_hard_negative_weight
+                            else 1.0
+                        ),
                     )
                 )
                 .view((-1, 1))
@@ -177,75 +179,27 @@ class neighborhood_il:
             self.NeighborhoodNet = util_dict["NeighborhoodNet"].to(device)
             if self.use_pretrained_neighbor:
                 self.NeighborhoodNet.load_state_dict(
-                    torch.load(self.pretrained_neighbor_weight_path)["neighborhood_state_dict"]
+                    torch.load(self.pretrained_neighbor_weight_path)[
+                        "neighborhood_state_dict"
+                    ]
                 )
-                print(f"load pretrained neighbor model from {self.pretrained_neighbor_weight_path}")
+                print(
+                    f"load pretrained neighbor model from {self.pretrained_neighbor_weight_path}"
+                )
             self.NeighborhoodNet_optimizer = torch.optim.Adam(
                 self.NeighborhoodNet.parameters(), lr=3e-4
             )
         if self.use_target_neighbor:
             self.TargetNeighborhoodNet = copy.deepcopy(self.NeighborhoodNet).to(device)
-        storage.load_expert_data(
+        self.expert_data_num = storage.load_expert_data(
             algo=self.algo,
             env_id=self.env_id,
             duplicate_expert_last_state=self.duplicate_expert_last_state,
             data_name=self.data_name,
+            expert_sub_sample_ratio=self.expert_sub_sample_ratio,
         )
         self.gen_data(storage)
         self.train(agent, env, storage)
-
-    # def test_with_neighborhood_model(self, agent, env):
-    #     # agent.eval()
-    #     total_reward = []
-    #     for i in range(10):
-    #         state_dim = env.observation_space.shape[0]
-    #         traj_ns = np.ones((1000, state_dim))
-    #         mask = np.zeros(1000)
-    #         step_counter = 0
-    #         state = env.reset()
-    #         done = False
-    #         while not done:
-    #             action = agent.act(state, testing=True)
-    #             # agent.q_network.reset_noise()
-    #             next_state, _, done, info = env.step(action)
-    #             state = next_state
-    #             traj_ns[step_counter] = next_state
-    #             step_counter += 1
-    #         mask[:step_counter] = 1
-    #         traj_ns = torch.FloatTensor(traj_ns).to(device)
-
-    #         cartesian_product_state = torch.cat(
-    #             (
-    #                 torch.repeat_interleave(traj_ns, 1000, dim=0),
-    #                 # in mujoco, 1000 is the number of expert states
-    #                 self.testing_expert_ns_data.reshape((-1, state_dim)),
-    #             ),
-    #             dim=1,
-    #         )
-
-    #         with torch.no_grad():
-    #             prob = self.NeighborhoodNet(cartesian_product_state)
-    #         prob = prob.reshape((1000, 1000)).sum(dim=1)
-    #         prob = prob.cpu().numpy() * mask
-    #         reward = prob.sum()
-    #         total_reward.append(reward)
-    #     with torch.no_grad():
-    #         expert_prob = self.NeighborhoodNet(self.expert_cartesian_product_state)
-    #     expert_reward = expert_prob.cpu().numpy().sum()
-
-    #     total_reward = np.array(total_reward)
-    #     total_reward_mean = total_reward.mean()
-    #     total_reward_std = total_reward.std()
-    #     total_reward_min = total_reward.min()
-    #     total_reward_max = total_reward.max()
-    #     return {
-    #         "neighborhood_agent_reward_mean": total_reward_mean,
-    #         "neighborhood_expert_reward": expert_reward,
-    #         "neighborhood_agent_reward_std": total_reward_std,
-    #         "neighborhood_agent_reward_min": total_reward_min,
-    #         "neighborhood_agent_reward_max": total_reward_max,
-    #         "relative_neighborhood_agent_reward": total_reward_mean / expert_reward,
-    #     }
 
     def test(self, agent, env, render_id=0):
         # agent.eval()
@@ -285,7 +239,7 @@ class neighborhood_il:
             traj_ns = torch.FloatTensor(traj_ns).to(device)
             cartesian_product_state = torch.cat(
                 (
-                    torch.repeat_interleave(traj_ns, 1000, dim=0),
+                    torch.repeat_interleave(traj_ns, self.expert_data_num, dim=0),
                     # in mujoco, 1000 is the number of expert states
                     self.testing_expert_ns_data.reshape((-1, state_dim)),
                 ),
@@ -293,7 +247,7 @@ class neighborhood_il:
             )
             with torch.no_grad():
                 prob = self.NeighborhoodNet(cartesian_product_state)
-            prob = prob.reshape((1000, 1000)).sum(dim=1)
+            prob = prob.reshape((1000, self.expert_data_num)).sum(dim=1)
             prob = prob.cpu().numpy() * mask
             reward = prob.sum()
             total_neighborhood_reward.append(reward)
@@ -566,7 +520,7 @@ class neighborhood_il:
                 negative_hard_data = negative_hard_data.to(device)
                 prediction = self.NeighborhoodNet(negative_hard_data)
                 prediction = prediction > 0.5
-                result = (prediction == False)
+                result = prediction == False
                 hard_negative_accuracy = torch.sum(result) / len(negative_hard_data)
 
         else:
@@ -580,7 +534,7 @@ class neighborhood_il:
             "neighbor_model_loss": loss.item(),
             "neighbor_model_positive_accuracy": positive_accuracy.item(),
             "neighbor_model_easy_negative_accuracy": easy_negative_accuracy.item(),
-            "neighbor_model_hard_negative_accuracy": hard_negative_accuracy.item()
+            "neighbor_model_hard_negative_accuracy": hard_negative_accuracy.item(),
         }
 
     def update_target_neighbor_model(self):

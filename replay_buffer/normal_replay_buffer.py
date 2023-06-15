@@ -6,7 +6,13 @@ import torch
 
 class normal_replay_buffer:
     def __init__(
-        self, size, state_dim, action_dim, save_env_states=False, save_state_idx=False, to_tensor=False
+        self,
+        size,
+        state_dim,
+        action_dim,
+        save_env_states=False,
+        save_state_idx=False,
+        to_tensor=False,
     ):
         self.size = size
         self.storage_index = 0
@@ -25,7 +31,6 @@ class normal_replay_buffer:
             self.rewards = torch.empty((size, 1))
             self.next_states = torch.empty((size, state_dim))
             self.dones = torch.empty((size, 1))
-
 
     def store(self, s, a, r, ss, d, env_state=None, state_idx=None):
         if self.to_tensor:
@@ -81,7 +86,9 @@ class normal_replay_buffer:
         else:
             if only_last_1m and self.size > 1000000:
                 indices = np.random.randint(
-                    max(0, self.storage_index - 1000000), self.storage_index, size=batch_size
+                    max(0, self.storage_index - 1000000),
+                    self.storage_index,
+                    size=batch_size,
                 )
             else:
                 indices = np.random.randint(
@@ -130,7 +137,14 @@ class normal_replay_buffer:
         with open(os.path.join(path, file_name), "wb") as handle:
             pickle.dump(data, handle)
 
-    def load_expert_data(self, algo, env_id, duplicate_expert_last_state, data_name=""):
+    def load_expert_data(
+        self,
+        algo,
+        env_id,
+        duplicate_expert_last_state,
+        data_name="",
+        expert_sub_sample_ratio=-1,
+    ):
         if data_name == "":
             path = f"./saved_expert_transition/{env_id}/{algo}/"
             if not os.path.isdir(path):
@@ -148,10 +162,23 @@ class normal_replay_buffer:
             data = pickle.load(handle)
         print(f"load expert data from path : {path}")
         self.expert_states = data["states"]
-        self.expert_actions = data["actions"]
-        self.expert_rewards = data["rewards"]
-        self.expert_next_states = data["next_states"]
-        self.expert_dones = data["dones"]
+        if expert_sub_sample_ratio > 0:
+            expert_num = len(self.expert_states)
+            idx_array = np.floor(
+                (1 / expert_sub_sample_ratio)
+                * np.array(range(int(expert_num // (1 / expert_sub_sample_ratio))))
+            ).astype(int)
+            #true for idx in idx array elsa false
+            sub_sample_mask = np.isin(np.array(range(expert_num)), idx_array)
+        else:
+            sub_sample_mask = np.ones(len(self.expert_states))
+        self.expert_states = self.expert_states[sub_sample_mask]
+        self.expert_actions = data["actions"][sub_sample_mask]
+        self.expert_rewards = data["rewards"][sub_sample_mask]
+        self.expert_next_states = data["next_states"][sub_sample_mask]
+        self.expert_dones = data["dones"][sub_sample_mask]
+        expert_data_num = np.sum(sub_sample_mask)
+        print(f"expert data size : {expert_data_num}")
         if self.to_tensor:
             self.expert_states = torch.FloatTensor(self.expert_states)
             self.expert_actions = torch.FloatTensor(self.expert_actions)
@@ -159,7 +186,7 @@ class normal_replay_buffer:
             self.expert_next_states = torch.FloatTensor(self.expert_next_states)
             self.expert_dones = torch.FloatTensor(self.expert_dones)
         if "env_states" in data.keys():
-            self.expert_env_states = data["env_states"]
+            self.expert_env_states = data["env_states"][sub_sample_mask]
         if duplicate_expert_last_state:
             done_idx = np.argwhere(self.expert_dones.reshape(-1) == 1).reshape(-1)
             done_expert_states = self.expert_states[done_idx]
@@ -203,6 +230,7 @@ class normal_replay_buffer:
                     ),
                     axis=0,
                 )
+        return expert_data_num
 
     def __len__(self):
         return min(self.storage_index, self.size)

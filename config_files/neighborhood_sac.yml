@@ -130,3 +130,5 @@ use_pretrained_neighbor:
   False
 pretrained_neighbor_weight_path:
   ""
+expert_sub_sample_ratio:
+  -1

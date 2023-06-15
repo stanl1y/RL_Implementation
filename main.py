@@ -61,6 +61,9 @@ def get_config():
         "--expert_transition_num", type=int, help="number of expert data"
     )
     parser.add_argument(
+        "--expert_sub_sample_ratio", type=float, help="propotion of expert data left in training(-1 means no subsample)"
+    )
+    parser.add_argument(
         "--save_env_states",
         action="store_true",
         help="store the env state for 'set_state' or not",
