@@ -171,7 +171,7 @@ class normal_replay_buffer:
             #true for idx in idx array elsa false
             sub_sample_mask = np.isin(np.array(range(expert_num)), idx_array)
         else:
-            sub_sample_mask = np.ones(len(self.expert_states))
+            sub_sample_mask = np.ones(len(self.expert_states), dtype=bool)
         self.expert_states = self.expert_states[sub_sample_mask]
         self.expert_actions = data["actions"][sub_sample_mask]
         self.expert_rewards = data["rewards"][sub_sample_mask]
