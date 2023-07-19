@@ -361,6 +361,8 @@ class neighborhood_il:
                     neighbor_info = self.update_neighbor_model(storage)
                 if self.use_IDM:
                     IDM_info = self.update_IDM(storage)
+                else:
+                    IDM_info = {}
                 loss_info = agent.update_using_neighborhood_reward(
                     storage,
                     self.NeighborhoodNet
