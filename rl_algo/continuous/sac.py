@@ -491,6 +491,7 @@ class sac(base_agent):
         reward_scaling_weight=1.0,
         use_true_expert_relative_reward=False,
         use_top_k=False,
+        InverseDynamicModule=None,
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -584,7 +585,12 @@ class sac(base_agent):
         )
         # print("update critic time", time.time() - t)
         # t = time.time()
-        if not state_only:
+        if not state_only or InverseDynamicModule is not None:
+            if InverseDynamicModule is not None:
+                input_data = torch.cat((expert_state, expert_next_state), axis=1)
+                expert_action = InverseDynamicModule(
+                    input_data,
+                ).detach()
             expert_critic_loss = self.update_critic(
                 expert_state,
                 expert_action,

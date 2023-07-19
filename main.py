@@ -49,10 +49,16 @@ def get_config():
         "--ood", action="store_true", help="Out of distribution evaluation"
     )
     parser.add_argument(
-        "--perturb_from_mid", action="store_true", default=False, help="When eval in ood mode, perturb from mid"
+        "--perturb_from_mid",
+        action="store_true",
+        default=False,
+        help="When eval in ood mode, perturb from mid",
     )
     parser.add_argument(
-        "--perturb_with_repeated_action", action="store_true", default=False, help="Perturb agent with repeated action instead of random action"
+        "--perturb_with_repeated_action",
+        action="store_true",
+        default=False,
+        help="Perturb agent with repeated action instead of random action",
     )
     parser.add_argument(
         "--perturb_step_num", type=int, default=10, help="number of perturb step"
@@ -61,7 +67,9 @@ def get_config():
         "--expert_transition_num", type=int, help="number of expert data"
     )
     parser.add_argument(
-        "--expert_sub_sample_ratio", type=float, help="propotion of expert data left in training(-1 means no subsample)"
+        "--expert_sub_sample_ratio",
+        type=float,
+        help="propotion of expert data left in training(-1 means no subsample)",
     )
     parser.add_argument(
         "--save_env_states",
@@ -145,6 +153,11 @@ def get_config():
         help="usetop k reward in neighborhood il",
     )
     parser.add_argument(
+        "--use_IDM",
+        action="store_true",
+        help="use InverseDynamicModule in neighborhood il (only for state only)",
+    )
+    parser.add_argument(
         "--use_pretrained_neighbor",
         action="store_true",
     )
@@ -172,7 +185,9 @@ def get_config():
         "--tau", type=float, help="tau for soft update of target network"
     )
     parser.add_argument(
-        "--neighborhood_tau", type=float, help="tau for soft update of target neighborhood network"
+        "--neighborhood_tau",
+        type=float,
+        help="tau for soft update of target neighborhood network",
     )
     parser.add_argument(
         "--log_name",

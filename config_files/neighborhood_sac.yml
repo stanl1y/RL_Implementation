@@ -3,7 +3,7 @@ env:
 algo:
   sac
 util:
-  ["NeighborhoodNet", "OracleNeighborhoodNet"]
+  ["NeighborhoodNet", "OracleNeighborhoodNet", "InverseDynamicModule"]
 oracle_neighbor:
   False
 wrapper_type:
@@ -132,3 +132,5 @@ pretrained_neighbor_weight_path:
   ""
 expert_sub_sample_ratio:
   -1
+use_IDM:
+  False

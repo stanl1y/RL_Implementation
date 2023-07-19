@@ -66,6 +66,7 @@ class neighborhood_il:
         self.use_pretrained_neighbor = config.use_pretrained_neighbor
         self.pretrained_neighbor_weight_path = config.pretrained_neighbor_weight_path
         self.expert_sub_sample_ratio = config.expert_sub_sample_ratio
+        self.use_IDM = config.use_IDM
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -114,9 +115,9 @@ class neighborhood_il:
             (
                 self.testing_expert_ns_data0,
                 # in mujoco, 1000 is the number of expert states
-                self.testing_expert_ns_data[: len(self.testing_expert_ns_data0)].reshape(
-                    (-1, self.testing_expert_ns_data.shape[-1])
-                ),
+                self.testing_expert_ns_data[
+                    : len(self.testing_expert_ns_data0)
+                ].reshape((-1, self.testing_expert_ns_data.shape[-1])),
             ),
             dim=1,
         )
@@ -189,6 +190,12 @@ class neighborhood_il:
             self.NeighborhoodNet_optimizer = torch.optim.Adam(
                 self.NeighborhoodNet.parameters(), lr=3e-4
             )
+        if self.use_IDM:
+            self.InverseDynamicModule = util_dict["InverseDynamicModule"].to(device)
+            self.IDM_optimizer = torch.optim.Adam(
+                self.InverseDynamicModule.parameters(), lr=3e-4
+            )
+            self.IDM_criteria = nn.MSELoss()
         if self.use_target_neighbor:
             self.TargetNeighborhoodNet = copy.deepcopy(self.NeighborhoodNet).to(device)
         self.expert_data_num = storage.load_expert_data(
@@ -352,6 +359,8 @@ class neighborhood_il:
                 neighbor_info = {}
                 if self.use_target_neighbor and not self.use_pretrained_neighbor:
                     neighbor_info = self.update_neighbor_model(storage)
+                if self.use_IDM:
+                    IDM_info = self.update_IDM(storage)
                 loss_info = agent.update_using_neighborhood_reward(
                     storage,
                     self.NeighborhoodNet
@@ -374,6 +383,7 @@ class neighborhood_il:
                     self.reward_scaling_weight,
                     self.use_true_expert_relative_reward,
                     self.use_top_k,
+                    self.InverseDynamicModule if self.use_IDM else None,
                 )
                 self.total_steps += 1
             agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
@@ -385,6 +395,7 @@ class neighborhood_il:
                     "threshold_ratio": self.policy_threshold_ratio,
                     **loss_info,
                     **neighbor_info,
+                    **IDM_info,
                     "entropy_loss_weight": agent.entropy_loss_weight,
                     "total_steps": self.total_steps,
                 }
@@ -545,6 +556,26 @@ class neighborhood_il:
                 target_param.data * (1.0 - self.neighborhood_tau)
                 + param.data * self.neighborhood_tau
             )
+
+    def update_IDM(self, storage):
+        # code for training inverse dynamic module
+        state, action, reward, next_state, done = storage.sample(self.batch_size)
+        if not storage.to_tensor:
+            state = torch.FloatTensor(state)
+            action = torch.FloatTensor(action)
+            next_state = torch.FloatTensor(next_state)
+        state = state.to(device)
+        action = action.to(device)
+        next_state = next_state.to(device)
+        input_data = torch.cat((state, next_state), axis=1)
+        input_data = input_data.to(device)
+        prediction = self.InverseDynamicModule(input_data)
+        loss = self.IDM_criteria(prediction, action)
+        loss = torch.mean(loss)
+        self.IDM_optimizer.zero_grad()
+        loss.backward()
+        self.IDM_optimizer.step()
+        return {"IDM_loss": loss.item()}
 
 
 # CUDA_VISIBLE_DEVICES=0 python3 main.py --main_stage neighborhood_il --main_task neighborhood_dsac --env LunarLander-v2 --wrapper basic --episode 2000 --log_name expectile99_ac_duplicateLast_nextStateReward_disReward
