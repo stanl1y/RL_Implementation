@@ -293,16 +293,16 @@ class neighborhood_il:
 
     def train(self, agent, env, storage):
         if self.bc_pretraining and not self.state_only:
-            (expert_state, expert_action, _, _, _, _,) = storage.sample(
-                self.batch_size,
-                expert=True,
-            )
-            if not storage.to_tensor:
-                expert_state = torch.FloatTensor(expert_state)
-                expert_action = torch.FloatTensor(expert_action)
-            expert_state = expert_state.to(device)
-            expert_action = expert_action.to(device)
             for _ in range(50000):
+                (expert_state, expert_action, _, _, _) = storage.sample(
+                    self.batch_size,
+                    expert=True,
+                )
+                if not storage.to_tensor:
+                    expert_state = torch.FloatTensor(expert_state)
+                    expert_action = torch.FloatTensor(expert_action)
+                expert_state = expert_state.to(device)
+                expert_action = expert_action.to(device)
                 bc_loss = agent.bc_update(expert_state, expert_action, use_mu=False)
             print(f"BC pretraining finished, BC loss:{bc_loss}")
         if self.buffer_warmup:

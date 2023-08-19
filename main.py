@@ -171,6 +171,10 @@ def get_config():
         help="target entropy weight for sac",
     )
     parser.add_argument(
+        "--neighbor_model_alpha",
+        type=float,
+    )
+    parser.add_argument(
         "--reward_scaling_weight", type=float, help="scale of relative reward"
     )
     parser.add_argument(
