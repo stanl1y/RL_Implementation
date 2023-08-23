@@ -419,7 +419,7 @@ class sac(base_agent):
             prob[prob <= 0.5] = 0
         reward = prob.reshape((len(next_state), -1))
         if use_top_k:
-            reward = reward.topk(10, dim=1, sorted=False)[0]
+            reward = reward.topk(1, dim=1, sorted=False)[0]
         reward = reward.sum(axis=1, keepdims=True)
         # print("reshape time", time.time() - t)
         # print("end neighborhood reward")
@@ -575,6 +575,8 @@ class sac(base_agent):
             else:
                 relative_expert_reward = expert_reward_ones
             # relative_expert_reward *= reward_scaling_weight
+        reward *= reward_scaling_weight
+        expert_reward *= reward_scaling_weight
         critic_loss = self.update_critic(
             state,
             action,
