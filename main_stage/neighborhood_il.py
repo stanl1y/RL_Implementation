@@ -63,6 +63,7 @@ class neighborhood_il:
         self.use_true_expert_relative_reward = config.use_true_expert_relative_reward
         self.low_hard_negative_weight = config.low_hard_negative_weight
         self.use_top_k = config.use_top_k
+        self.k_of_topk = config.k_of_topk
         self.use_pretrained_neighbor = config.use_pretrained_neighbor
         self.pretrained_neighbor_weight_path = config.pretrained_neighbor_weight_path
         self.expert_sub_sample_ratio = config.expert_sub_sample_ratio
@@ -385,6 +386,7 @@ class neighborhood_il:
                     self.reward_scaling_weight,
                     self.use_true_expert_relative_reward,
                     self.use_top_k,
+                    self.k_of_topk,
                     self.InverseDynamicModule if self.use_IDM else None,
                 )
                 self.total_steps += 1

@@ -96,9 +96,8 @@ class sac(base_agent):
                 for critic_target in self.critic_target
             ]
             target_value = reward + self.gamma * (1 - done) * (
-                torch.min(target_q_val[0], target_q_val[1]) + (0
-                if without_entropy
-                else -self.alpha * next_log_prob)
+                torch.min(target_q_val[0], target_q_val[1])
+                + (0 if without_entropy else -self.alpha * next_log_prob)
             )
 
         """compute loss and update"""
@@ -381,6 +380,7 @@ class sac(base_agent):
         oracle_neighbor,
         discretize_reward=False,
         use_top_k=False,
+        k_of_topk=1,
     ):
 
         """construct a tensor that looks like
@@ -419,7 +419,7 @@ class sac(base_agent):
             prob[prob <= 0.5] = 0
         reward = prob.reshape((len(next_state), -1))
         if use_top_k:
-            reward = reward.topk(1, dim=1, sorted=False)[0]
+            reward = reward.topk(k_of_topk, dim=1, sorted=False)[0]
         reward = reward.sum(axis=1, keepdims=True)
         # print("reshape time", time.time() - t)
         # print("end neighborhood reward")
@@ -491,6 +491,7 @@ class sac(base_agent):
         reward_scaling_weight=1.0,
         use_true_expert_relative_reward=False,
         use_top_k=False,
+        k_of_topk=1,
         InverseDynamicModule=None,
     ):
         # print("in update_using_neighborhood_reward")
@@ -517,6 +518,7 @@ class sac(base_agent):
             oracle_neighbor,
             discretize_reward,
             use_top_k=use_top_k,
+            k_of_topk=k_of_topk,
         )
         # print("neighborhood reward time", time.time() - t)
         # t = time.time()
@@ -614,7 +616,7 @@ class sac(base_agent):
         # print("update expert critic time", time.time() - t)
         # t = time.time()
         reward_dict = {
-            "sampled_expert_reward_mean": expert_reward_mean,
+            "sampled_expert_reward_mean": expert_reward.mean().item(),
             "sampled_agent_reward_mean": reward.mean().item(),
         }
         if use_relative_reward:

@@ -153,6 +153,11 @@ def get_config():
         help="usetop k reward in neighborhood il",
     )
     parser.add_argument(
+        "--k_of_topk",
+        type=int,
+        help="value of k",
+    )
+    parser.add_argument(
         "--use_IDM",
         action="store_true",
         help="use InverseDynamicModule in neighborhood il (only for state only)",
