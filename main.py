@@ -222,6 +222,9 @@ def get_config():
     parser.add_argument(
         "--explore_step", type=int, help="number of step of exploration in set_state_il"
     )
+    parser.add_argument(
+        "--infinite_bootstrap", action="store_true", help="infinite bootstrapping (done is always false)"
+    )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 

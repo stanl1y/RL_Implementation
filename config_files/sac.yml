@@ -59,3 +59,5 @@ terminate_when_unhealthy:
   True
 save_state_idx:
   False
+infinite_bootstrap:
+  False

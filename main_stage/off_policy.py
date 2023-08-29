@@ -15,6 +15,7 @@ class vanilla_off_policy_training_stage:
         self.continue_training = config.continue_training
         self.render = config.render
         self.delete_prev_weight = config.delete_prev_weight
+        self.infinite_bootstrap = config.infinite_bootstrap
         wandb.init(
             project="RL_Implementation",
             name=f"{self.algo}_{self.env_id}",
@@ -68,7 +69,7 @@ class vanilla_off_policy_training_stage:
             ):  # because HER buffer's len is num of rollout
                 action = env.action_space.sample()
                 next_state, reward, done, info = env.step(action)
-                storage.store(state, action, reward, next_state, done)
+                storage.store(state, action, reward, next_state, (done if not self.infinite_bootstrap else False))
                 if done:
                     state = env.reset()
                     done = False
@@ -91,7 +92,7 @@ class vanilla_off_policy_training_stage:
                     action = agent.act(state)
                 next_state, reward, done, info = env.step(action)
                 total_reward += reward
-                storage.store(state, action, reward, next_state, done)
+                storage.store(state, action, reward, next_state, (done if not self.infinite_bootstrap else False))
                 loss_info = agent.update(storage)
                 wandb.log(loss_info, commit=False)
                 state = next_state

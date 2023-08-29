@@ -1,7 +1,7 @@
 import gym
 from .wrapper import *
 from .custom_env import *
-
+import gymnasium
           
 
 def get_env(env_name,wrapper_type,terminate_when_unhealthy=False):
@@ -11,7 +11,8 @@ def get_env(env_name,wrapper_type,terminate_when_unhealthy=False):
         https://github.com/eleurent/highway-env
         '''
         import highway_env
-    if env_name in ["Maze-v0", "Maze-v1", "Maze-v2"]:
+        env=gym.make(env_name)
+    elif env_name in ["Maze-v0", "Maze-v1", "Maze-v2"]:
         '''
         custom_env:
         '''
@@ -22,7 +23,8 @@ def get_env(env_name,wrapper_type,terminate_when_unhealthy=False):
             env=gym.make(env_name,**dict(random_reset=True,combine_s_g=True))
         else:
             env=gym.make(env_name,**dict(random_reset=True))
-
+    elif env_name in ["AdroitHandDoor-v1","AdroitHandHammer-v1","AdroitHandPen-v1","AdroitHandRelocate-v1"]:
+        env = gymnasium.make('AdroitHandDoor-v1')#, max_episode_steps=400
     else:
         try:
             env=gym.make(env_name,terminate_when_unhealthy=terminate_when_unhealthy)
@@ -36,8 +38,9 @@ def get_env(env_name,wrapper_type,terminate_when_unhealthy=False):
     elif wrapper_type=="her":
         return HERWrapper(env)
     elif wrapper_type=="normobs":
-        
         return NormObs(env)
+    elif wrapper_type=="gymnasium":
+        return GymnasiumWrapper(env)
     else:
         raise TypeError(f"env wrapper type : {wrapper_type} not supported")
 

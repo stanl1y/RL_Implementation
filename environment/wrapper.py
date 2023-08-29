@@ -1,5 +1,6 @@
 import gym
 from gym.spaces import Box
+from gymnasium.spaces import Box as BoxGymnasium
 import numpy as np
 from gym.wrappers import FilterObservation, FlattenObservation
 from gym import ObservationWrapper
@@ -22,6 +23,17 @@ class BasicWrapper(gym.Wrapper):
         else:
             return self.env.action_space.n
 
+class GymnasiumWrapper(BasicWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+    def is_continuous(self):
+        return type(self.env.action_space) == BoxGymnasium
+    def reset(self):
+        return self.env.reset()[0]
+    def step(self, action):
+        nextState, reward, done, truncated, info = self.env.step(action)
+        return nextState, reward, truncated, info
 
 class GymRoboticWrapper(BasicWrapper):
     def __init__(self, env):
