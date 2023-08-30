@@ -223,7 +223,12 @@ def get_config():
         "--explore_step", type=int, help="number of step of exploration in set_state_il"
     )
     parser.add_argument(
-        "--infinite_bootstrap", action="store_true", help="infinite bootstrapping (done is always false)"
+        "--max_episode_steps", type=int, help="max step of each episode"
+    )
+    parser.add_argument(
+        "--infinite_bootstrap",
+        action="store_true",
+        help="infinite bootstrapping (done is always false)",
     )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
@@ -233,7 +238,12 @@ def get_config():
 
 if __name__ == "__main__":
     config, config_text = get_config()
-    env = get_env(config.env, config.wrapper_type, config.terminate_when_unhealthy)
+    env = get_env(
+        config.env,
+        config.wrapper_type,
+        config.terminate_when_unhealthy,
+        config.max_episode_steps,
+    )
     agent = get_rl_agent(env, config)
     storage = get_replay_buffer(env, config)
     main_fn = get_main_stage(config)

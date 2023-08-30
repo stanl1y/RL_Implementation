@@ -61,3 +61,5 @@ save_state_idx:
   False
 infinite_bootstrap:
   False
+max_episode_steps:
+  -1

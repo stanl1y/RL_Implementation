@@ -136,3 +136,5 @@ expert_sub_sample_ratio:
   -1
 use_IDM:
   False
+max_episode_steps:
+  -1
