@@ -31,6 +31,7 @@ class sac(base_agent):
         batch_size=256,
         use_ounoise=False,
         log_alpha_init=0,
+        no_update_alpha=False,
     ):
 
         super().__init__(
@@ -58,6 +59,7 @@ class sac(base_agent):
         self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr)
         self.best_log_alpha_optimizer = copy.deepcopy(self.log_alpha_optimizer)
         self.entropy_loss_weight = 1.0
+        self.no_update_alpha = no_update_alpha
         self.ounoise = (
             OUNoise(
                 action_dimension=action_dim,
@@ -118,7 +120,6 @@ class sac(base_agent):
         state,
         reward=None,
         threshold=None,
-        no_update_alpha=False,
         target_entropy_weight=1.0,
     ):
         if threshold != None:
@@ -142,7 +143,7 @@ class sac(base_agent):
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
-            if not no_update_alpha:
+            if not self.no_update_alpha:
                 """update alpha"""
                 alpha_loss = (
                     self.alpha
@@ -276,7 +277,6 @@ class sac(base_agent):
         oracle_neighbor=False,
         policy_threshold_ratio=0.5,
         use_env_done=False,
-        no_update_alpha=False,
     ):
         """sample agent data"""
         state, action, _, next_state, done, state_idx = storage.sample(
@@ -337,7 +337,6 @@ class sac(base_agent):
                 state,
                 reward=reward,
                 threshold=expert_reward_mean * policy_threshold_ratio,
-                no_update_alpha=no_update_alpha,
             )
         critic_loss = self.update_critic(
             state,
@@ -483,7 +482,6 @@ class sac(base_agent):
         discretize_reward=False,
         policy_threshold_ratio=0.5,
         use_env_done=False,
-        no_update_alpha=False,
         use_relative_reward=False,
         state_only=False,
         critic_without_entropy=False,
@@ -559,7 +557,6 @@ class sac(base_agent):
                 state,
                 # reward=reward,
                 # threshold=expert_reward_mean * policy_threshold_ratio,
-                no_update_alpha=no_update_alpha,
                 target_entropy_weight=target_entropy_weight,
             )
             # expert_actor_loss = self.update_actor(

@@ -50,7 +50,6 @@ class neighborhood_il:
         self.tau = config.tau
         self.neighborhood_tau = config.neighborhood_tau
         self.entropy_loss_weight_decay_rate = config.entropy_loss_weight_decay_rate
-        self.no_update_alpha = config.no_update_alpha
         self.infinite_neighbor_buffer = config.infinite_neighbor_buffer
         self.bc_pretraining = config.bc_pretraining
         self.hybrid = config.hybrid
@@ -378,7 +377,6 @@ class neighborhood_il:
                     self.discretize_reward,
                     self.policy_threshold_ratio,
                     self.use_env_done,
-                    self.no_update_alpha,
                     self.use_relative_reward,
                     self.state_only,
                     self.critic_without_entropy,

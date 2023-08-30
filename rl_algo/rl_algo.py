@@ -20,6 +20,7 @@ def get_rl_agent(env, config):
             batch_size=config.batch_size,
             use_ounoise=config.use_ounoise,
             log_alpha_init=config.log_alpha_init,
+            no_update_alpha=config.no_update_alpha,
         )
     elif config.algo == "ddpg":
         return ddpg(
