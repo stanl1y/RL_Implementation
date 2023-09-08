@@ -230,6 +230,11 @@ def get_config():
         action="store_true",
         help="infinite bootstrapping (done is always false)",
     )
+    parser.add_argument(
+        "--reset_as_expert_state",
+        action="store_true",
+        help="reset env as first state of expert state",
+    )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 

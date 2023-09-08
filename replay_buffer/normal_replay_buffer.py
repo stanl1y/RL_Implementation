@@ -187,6 +187,8 @@ class normal_replay_buffer:
             self.expert_dones = torch.FloatTensor(self.expert_dones)
         if "env_states" in data.keys():
             self.expert_env_states = np.array(data["env_states"],dtype=object)[sub_sample_mask]
+        if "options" in data.keys():
+            self.env_reset_options = data["options"]
         if duplicate_expert_last_state:
             done_idx = np.argwhere(self.expert_dones.reshape(-1) == 1).reshape(-1)
             done_expert_states = self.expert_states[done_idx]

@@ -138,3 +138,5 @@ use_IDM:
   False
 max_episode_steps:
   -1
+reset_as_expert_state:
+  False

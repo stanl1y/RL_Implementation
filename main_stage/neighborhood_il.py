@@ -67,6 +67,7 @@ class neighborhood_il:
         self.pretrained_neighbor_weight_path = config.pretrained_neighbor_weight_path
         self.expert_sub_sample_ratio = config.expert_sub_sample_ratio
         self.use_IDM = config.use_IDM
+        self.reset_as_expert_state = config.reset_as_expert_state
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -205,6 +206,8 @@ class neighborhood_il:
             data_name=self.data_name,
             expert_sub_sample_ratio=self.expert_sub_sample_ratio,
         )
+        if self.reset_as_expert_state:
+            self.env_reset_options = storage.env_reset_options
         self.gen_data(storage)
         self.train(agent, env, storage)
 
@@ -306,14 +309,20 @@ class neighborhood_il:
                 bc_loss = agent.bc_update(expert_state, expert_action, use_mu=False)
             print(f"BC pretraining finished, BC loss:{bc_loss}")
         if self.buffer_warmup:
-            state = env.reset()
+            if self.reset_as_expert_state:
+                state = env.reset(options=self.env_reset_options)
+            else:
+                state = env.reset()
             done = False
             while len(storage) < self.buffer_warmup_step:
                 action = agent.act(state)
                 next_state, reward, done, info = env.step(action)
                 storage.store(state, action, reward, next_state, done)
                 if done:
-                    state = env.reset()
+                    if self.reset_as_expert_state:
+                        state = env.reset(options=self.env_reset_options)
+                    else:
+                        state = env.reset()
                     done = False
                 else:
                     state = next_state
@@ -347,7 +356,10 @@ class neighborhood_il:
                 if self.fix_env_random_seed:
                     state = env.reset(seed=0)
                 else:
-                    state = env.reset()
+                    if self.reset_as_expert_state:
+                        state = env.reset(options=self.env_reset_options)
+                    else:
+                        state = env.reset()
             done = False
             total_reward = 0
             while not done:
