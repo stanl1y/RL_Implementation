@@ -235,6 +235,11 @@ def get_config():
         action="store_true",
         help="reset env as first state of expert state",
     )
+    parser.add_argument(
+        "--bc_only",
+        action="store_true",
+        help="only train policy with bc loss",
+    )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 
