@@ -72,6 +72,11 @@ def get_config():
         help="propotion of expert data left in training(-1 means no subsample)",
     )
     parser.add_argument(
+        "--policy_threshold_ratio",
+        type=float,
+        help="threshold ratio for filtering out expert-like data in policy training",
+    )
+    parser.add_argument(
         "--save_env_states",
         action="store_true",
         help="store the env state for 'set_state' or not",
