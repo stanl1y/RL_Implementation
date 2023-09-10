@@ -74,6 +74,7 @@ class neighborhood_il:
             self.policy_threshold_ratio = 0.1
         else:
             self.policy_threshold_ratio = config.policy_threshold_ratio
+            print(f"policy_threshold_ratio: {self.policy_threshold_ratio}")
 
         try:
             self.margin_value = config.margin_value

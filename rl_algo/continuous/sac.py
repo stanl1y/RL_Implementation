@@ -130,6 +130,8 @@ class sac(base_agent):
         filtered = state.shape[0] - policy_state.shape[0]
         actor_loss = 0
         alpha_loss = 0
+        entropy_loss = 0
+        log_prob = 0
         if policy_state.shape[0] > 0:
             action, log_prob, mu = self.actor.sample(policy_state)
             q_val = [critic(policy_state, action) for critic in self.critic]
@@ -152,13 +154,15 @@ class sac(base_agent):
                 self.log_alpha_optimizer.zero_grad()
                 alpha_loss.backward()
                 self.log_alpha_optimizer.step()
+            entropy_loss = entropy_loss.mean()
+            log_prob = log_prob.mean()
         return {
             "actor_loss": actor_loss,
             "alpha_loss": alpha_loss,
             "alpha": self.alpha,
             "filtered": filtered,
-            "entropy_loss": entropy_loss.mean(),
-            "log_prob": log_prob.mean(),
+            "entropy_loss": entropy_loss,
+            "log_prob": log_prob,
         }
 
     def bc_update(self, expert_state, expert_action, use_mu=True):
@@ -555,8 +559,8 @@ class sac(base_agent):
         if not bc_only:
             actor_loss = self.update_actor(
                 state,
-                # reward=reward,
-                # threshold=expert_reward_mean * policy_threshold_ratio,
+                reward=reward,
+                threshold=expert_reward_mean * policy_threshold_ratio,
                 target_entropy_weight=target_entropy_weight,
             )
             # expert_actor_loss = self.update_actor(
