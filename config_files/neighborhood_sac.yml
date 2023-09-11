@@ -140,3 +140,7 @@ max_episode_steps:
   -1
 reset_as_expert_state:
   False
+initial_state_key_to_add_noise:
+  ["qpos","qvel"]
+initial_state_noise_std:
+  0.01

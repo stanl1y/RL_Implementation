@@ -29,8 +29,8 @@ class GymnasiumWrapper(BasicWrapper):
 
     def is_continuous(self):
         return type(self.env.action_space) == BoxGymnasium
-    def reset(self):
-        return self.env.reset()[0]
+    def reset(self, options=None):
+        return self.env.reset(options=options)[0]
     def step(self, action):
         nextState, reward, done, truncated, info = self.env.step(action)
         return nextState, reward, truncated, info

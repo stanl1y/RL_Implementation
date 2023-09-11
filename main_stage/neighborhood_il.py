@@ -68,6 +68,8 @@ class neighborhood_il:
         self.expert_sub_sample_ratio = config.expert_sub_sample_ratio
         self.use_IDM = config.use_IDM
         self.reset_as_expert_state = config.reset_as_expert_state
+        self.initial_state_key_to_add_noise = config.initial_state_key_to_add_noise
+        self.initial_state_noise_std = config.initial_state_noise_std
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -227,6 +229,21 @@ class neighborhood_il:
             mask = np.zeros(1000)
             step_counter = 0
             state = env.reset()
+
+            if self.reset_as_expert_state:
+                if len(self.initial_state_key_to_add_noise) > 0:
+                    for key in self.initial_state_key_to_add_noise:
+                        self.env_reset_options["initial_state_dict"][
+                            key
+                        ] += np.random.normal(
+                            0,
+                            self.initial_state_noise_std,
+                            self.env_reset_options["initial_state_dict"][key].shape,
+                        )
+                state = env.reset(options=self.env_reset_options)
+            else:
+                state = env.reset()
+            
             done = False
             episode_reward = 0
             if self.ood:
@@ -311,6 +328,15 @@ class neighborhood_il:
             print(f"BC pretraining finished, BC loss:{bc_loss}")
         if self.buffer_warmup:
             if self.reset_as_expert_state:
+                if len(self.initial_state_key_to_add_noise) > 0:
+                    for key in self.initial_state_key_to_add_noise:
+                        self.env_reset_options["initial_state_dict"][
+                            key
+                        ] += np.random.normal(
+                            0,
+                            self.initial_state_noise_std,
+                            self.env_reset_options["initial_state_dict"][key].shape,
+                        )
                 state = env.reset(options=self.env_reset_options)
             else:
                 state = env.reset()
@@ -321,6 +347,15 @@ class neighborhood_il:
                 storage.store(state, action, reward, next_state, done)
                 if done:
                     if self.reset_as_expert_state:
+                        if len(self.initial_state_key_to_add_noise) > 0:
+                            for key in self.initial_state_key_to_add_noise:
+                                self.env_reset_options["initial_state_dict"][
+                                    key
+                                ] += np.random.normal(
+                                    0,
+                                    self.initial_state_noise_std,
+                                    self.env_reset_options["initial_state_dict"][key].shape,
+                                )
                         state = env.reset(options=self.env_reset_options)
                     else:
                         state = env.reset()
@@ -358,6 +393,15 @@ class neighborhood_il:
                     state = env.reset(seed=0)
                 else:
                     if self.reset_as_expert_state:
+                        if len(self.initial_state_key_to_add_noise) > 0:
+                            for key in self.initial_state_key_to_add_noise:
+                                self.env_reset_options["initial_state_dict"][
+                                    key
+                                ] += np.random.normal(
+                                    0,
+                                    self.initial_state_noise_std,
+                                    self.env_reset_options["initial_state_dict"][key].shape,
+                                )
                         state = env.reset(options=self.env_reset_options)
                     else:
                         state = env.reset()

@@ -245,6 +245,11 @@ def get_config():
         action="store_true",
         help="only train policy with bc loss",
     )
+    parser.add_argument(
+        "--initial_state_noise_std",
+        type=float,
+        help="std of noise added to initial state",
+    )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 
