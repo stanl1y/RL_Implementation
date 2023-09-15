@@ -144,3 +144,5 @@ initial_state_key_to_add_noise:
   ["qpos","qvel"]
 initial_state_noise_std:
   0.01
+complementary_reward:
+  False

@@ -70,6 +70,16 @@ class neighborhood_il:
         self.reset_as_expert_state = config.reset_as_expert_state
         self.initial_state_key_to_add_noise = config.initial_state_key_to_add_noise
         self.initial_state_noise_std = config.initial_state_noise_std
+        self.complementary_reward = config.complementary_reward
+        if self.env_id in [
+            "AdroitHandDoor-v1",
+            "AdroitHandHammer-v1",
+            "AdroitHandPen-v1",
+            "AdroitHandRelocate-v1",
+        ]:
+            self.record_success_rate = True
+        else:
+            self.record_success_rate = False
         if self.hard_negative_sampling:
             print("hard negative sampling")
         if self.auto_threshold_ratio:
@@ -229,7 +239,8 @@ class neighborhood_il:
             mask = np.zeros(1000)
             step_counter = 0
             state = env.reset()
-
+            if self.record_success_rate:
+                success_counter = 0.0
             if self.reset_as_expert_state:
                 if len(self.initial_state_key_to_add_noise) > 0:
                     for key in self.initial_state_key_to_add_noise:
@@ -261,6 +272,9 @@ class neighborhood_il:
                 state = next_state
                 traj_ns[step_counter] = next_state
                 step_counter += 1
+            if self.record_success_rate:
+                if state[-1]==1:
+                    success_counter += 1
             total_reward.append(episode_reward)
 
             mask[:step_counter] = 1
@@ -298,7 +312,9 @@ class neighborhood_il:
         total_reward_min = total_reward.min()
         total_reward_max = total_reward.max()
         # agent.train()
-        return {
+        if self.record_success_rate:
+            success_counter/=10.0
+        return_info={
             "testing_reward_mean": total_reward_mean,
             "testing_reward_std": total_reward_std,
             "testing_reward_min": total_reward_min,
@@ -311,6 +327,9 @@ class neighborhood_il:
             "relative_neighborhood_agent_reward": total_neighborhood_reward_mean
             / expert_reward,
         }
+        if self.record_success_rate:
+            return_info["success_rate"] = success_counter
+        return return_info
 
     def train(self, agent, env, storage):
         if self.bc_pretraining and not self.state_only:
@@ -443,6 +462,7 @@ class neighborhood_il:
                     self.use_top_k,
                     self.k_of_topk,
                     self.InverseDynamicModule if self.use_IDM else None,
+                    self.complementary_reward,
                 )
                 self.total_steps += 1
             agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate

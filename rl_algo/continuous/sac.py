@@ -384,6 +384,7 @@ class sac(base_agent):
         discretize_reward=False,
         use_top_k=False,
         k_of_topk=1,
+        complementary_reward=False,
     ):
 
         """construct a tensor that looks like
@@ -421,9 +422,15 @@ class sac(base_agent):
             prob[prob > 0.5] = 0.5
             prob[prob <= 0.5] = 0
         reward = prob.reshape((len(next_state), -1))
-        if use_top_k:
-            reward = reward.topk(k_of_topk, dim=1, sorted=False)[0]
-        reward = reward.sum(axis=1, keepdims=True)
+        if complementary_reward:
+            reward = reward.topk(20, dim=1, sorted=False)[0]
+            reward = 1-reward
+            #one minus product of top5 1-probabilities
+            reward = 1 - torch.sqrt(reward.prod(axis=1, keepdims=True))
+        else:
+            if use_top_k:
+                reward = reward.topk(k_of_topk, dim=1, sorted=False)[0]
+            reward = reward.sum(axis=1, keepdims=True)
         # print("reshape time", time.time() - t)
         # print("end neighborhood reward")
         return reward
@@ -495,6 +502,7 @@ class sac(base_agent):
         use_top_k=False,
         k_of_topk=1,
         InverseDynamicModule=None,
+        complementary_reward=False
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -521,6 +529,7 @@ class sac(base_agent):
             discretize_reward,
             use_top_k=use_top_k,
             k_of_topk=k_of_topk,
+            complementary_reward=complementary_reward
         )
         # print("neighborhood reward time", time.time() - t)
         # t = time.time()
@@ -546,6 +555,7 @@ class sac(base_agent):
             oracle_neighbor,
             discretize_reward,
             use_top_k=use_top_k,
+            complementary_reward=complementary_reward,
         )
         # print("expert neighborhood reward time", time.time() - t)
         # t = time.time()

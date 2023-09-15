@@ -250,6 +250,11 @@ def get_config():
         type=float,
         help="std of noise added to initial state",
     )
+    parser.add_argument(
+        "--complementary_reward",
+        action="store_true",
+        help="use complementary reward in neighborhood il",
+    )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 
