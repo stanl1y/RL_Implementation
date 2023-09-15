@@ -233,14 +233,14 @@ class neighborhood_il:
             frame_buffer = []
             if not os.path.exists(f"./experiment_logs/{self.env_id}/{self.log_name}/"):
                 os.makedirs(f"./experiment_logs/{self.env_id}/{self.log_name}/")
+        if self.record_success_rate:
+            success_counter = 0.0
         for i in range(10):
             state_dim = env.observation_space.shape[0]
             traj_ns = np.ones((1000, state_dim))
             mask = np.zeros(1000)
             step_counter = 0
             state = env.reset()
-            if self.record_success_rate:
-                success_counter = 0.0
             if self.reset_as_expert_state:
                 if len(self.initial_state_key_to_add_noise) > 0:
                     for key in self.initial_state_key_to_add_noise:
