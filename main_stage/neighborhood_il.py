@@ -238,7 +238,7 @@ class neighborhood_il:
         if self.record_success_rate:
             success_counter = 0.0
         for i in range(10):
-            state_dim = env.observation_space.shape[0]
+            state_dim = env.get_observation_dim()
             traj_ns = np.ones((1000, state_dim))
             mask = np.zeros(1000)
             step_counter = 0
