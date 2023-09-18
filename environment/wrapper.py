@@ -23,17 +23,33 @@ class BasicWrapper(gym.Wrapper):
         else:
             return self.env.action_space.n
 
+
 class GymnasiumWrapper(BasicWrapper):
-    def __init__(self, env):
+    def __init__(self, env, only_use_relative_state=False):
         super().__init__(env)
+        self.only_use_relative_state = only_use_relative_state
 
     def is_continuous(self):
         return type(self.env.action_space) == BoxGymnasium
+
+    def get_observation_dim(self):
+        if self.only_use_relative_state:
+            return self.env.observation_space.shape[0] - 6
+        else:
+            return self.env.observation_space.shape[0] 
+
     def reset(self, options=None):
-        return self.env.reset(options=options)[0]
+        s = self.env.reset(options=options)[0]
+        if self.only_use_relative_state:
+            s = np.delete(s, np.s_[29:35])
+        return s
+
     def step(self, action):
         nextState, reward, done, truncated, info = self.env.step(action)
+        if self.only_use_relative_state:
+            nextState = np.delete(nextState, np.s_[29:35])
         return nextState, reward, truncated, info
+
 
 class GymRoboticWrapper(BasicWrapper):
     def __init__(self, env):

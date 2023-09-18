@@ -71,6 +71,7 @@ class neighborhood_il:
         self.initial_state_key_to_add_noise = config.initial_state_key_to_add_noise
         self.initial_state_noise_std = config.initial_state_noise_std
         self.complementary_reward = config.complementary_reward
+        self.only_use_relative_state = config.only_use_relative_state
         if self.env_id in [
             "AdroitHandDoor-v1",
             "AdroitHandHammer-v1",
@@ -218,6 +219,7 @@ class neighborhood_il:
             duplicate_expert_last_state=self.duplicate_expert_last_state,
             data_name=self.data_name,
             expert_sub_sample_ratio=self.expert_sub_sample_ratio,
+            only_use_relative_state=self.only_use_relative_state,
         )
         if self.reset_as_expert_state:
             self.env_reset_options = storage.env_reset_options

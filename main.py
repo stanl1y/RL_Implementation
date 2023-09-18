@@ -255,6 +255,11 @@ def get_config():
         action="store_true",
         help="use complementary reward in neighborhood il",
     )
+    parser.add_argument(
+        "--only_use_relative_state",
+        action="store_true",
+        help="delete absolute state dimension from env observation",
+    )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 
@@ -268,6 +273,7 @@ if __name__ == "__main__":
         config.wrapper_type,
         config.terminate_when_unhealthy,
         config.max_episode_steps,
+        config.only_use_relative_state
     )
     agent = get_rl_agent(env, config)
     storage = get_replay_buffer(env, config)

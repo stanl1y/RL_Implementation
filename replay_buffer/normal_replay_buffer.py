@@ -24,6 +24,7 @@ class normal_replay_buffer:
         self.env_states = [] if save_env_states else None
         self.states_idx = np.empty((size, 1), dtype=int) if save_state_idx else None
         self.to_tensor = to_tensor
+
         if self.to_tensor:
             print("Replay buffer stores tensor")
             self.states = torch.empty((size, state_dim))
@@ -144,6 +145,7 @@ class normal_replay_buffer:
         duplicate_expert_last_state,
         data_name="",
         expert_sub_sample_ratio=-1,
+        only_use_relative_state=False,
     ):
         if data_name == "":
             path = f"./saved_expert_transition/{env_id}/{algo}/"
@@ -178,6 +180,11 @@ class normal_replay_buffer:
         self.expert_next_states = data["next_states"][sub_sample_mask]
         self.expert_dones = data["dones"][sub_sample_mask]
         expert_data_num = np.sum(sub_sample_mask)
+        if only_use_relative_state:
+            self.expert_states = np.delete(self.expert_states, np.s_[29:35], axis=1)
+            self.expert_next_states = np.delete(
+                self.expert_next_states, np.s_[29:35], axis=1
+            )
         print(f"expert data size : {expert_data_num}")
         if self.to_tensor:
             self.expert_states = torch.FloatTensor(self.expert_states)

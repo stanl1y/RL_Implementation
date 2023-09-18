@@ -5,7 +5,11 @@ import gymnasium
 
 
 def get_env(
-    env_name, wrapper_type, terminate_when_unhealthy=False, max_episode_steps=-1
+    env_name,
+    wrapper_type,
+    terminate_when_unhealthy=False,
+    max_episode_steps=-1,
+    only_use_relative_state=False,
 ):
     if env_name in [
         "highway-v0",
@@ -58,6 +62,8 @@ def get_env(
     elif wrapper_type == "normobs":
         return NormObs(env)
     elif wrapper_type == "gymnasium":
-        return GymnasiumWrapper(env)
+        return GymnasiumWrapper(
+            env, only_use_relative_state=only_use_relative_state
+        )
     else:
         raise TypeError(f"env wrapper type : {wrapper_type} not supported")
