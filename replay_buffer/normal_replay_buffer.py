@@ -24,7 +24,6 @@ class normal_replay_buffer:
         self.env_states = [] if save_env_states else None
         self.states_idx = np.empty((size, 1), dtype=int) if save_state_idx else None
         self.to_tensor = to_tensor
-
         if self.to_tensor:
             print("Replay buffer stores tensor")
             self.states = torch.empty((size, state_dim))

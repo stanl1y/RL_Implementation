@@ -117,6 +117,10 @@ class neighborhood_il:
                 expert_next_state, self.expert_data_num, dim=0
             ).to(device)
         else:
+            # add [0.3,0.4] into expert_next_state, dtype=np.array
+            # expert_next_state = np.concatenate(
+            #     (expert_next_state, np.array([[-0.3, -0.4]])), axis=0
+            # )
             self.expert_ns_data = np.tile(expert_next_state, (self.batch_size, 1))
             self.expert_ns_data = torch.FloatTensor(self.expert_ns_data).to(device)
             self.testing_expert_ns_data = np.tile(expert_next_state, (1000, 1))
@@ -242,7 +246,10 @@ class neighborhood_il:
             traj_ns = np.ones((1000, state_dim))
             mask = np.zeros(1000)
             step_counter = 0
-            state = env.reset()
+            try:
+                state = env.reset(testing=True)
+            except:
+                state = env.reset()
             if self.reset_as_expert_state:
                 if len(self.initial_state_key_to_add_noise) > 0:
                     for key in self.initial_state_key_to_add_noise:
@@ -256,7 +263,7 @@ class neighborhood_il:
                 state = env.reset(options=self.env_reset_options)
             else:
                 state = env.reset()
-            
+
             done = False
             episode_reward = 0
             if self.ood:
@@ -275,7 +282,7 @@ class neighborhood_il:
                 traj_ns[step_counter] = next_state
                 step_counter += 1
             if self.record_success_rate:
-                if state[-1]==1:
+                if state[-1] == 1:
                     success_counter += 1
             total_reward.append(episode_reward)
 
@@ -315,8 +322,8 @@ class neighborhood_il:
         total_reward_max = total_reward.max()
         # agent.train()
         if self.record_success_rate:
-            success_counter/=10.0
-        return_info={
+            success_counter /= 10.0
+        return_info = {
             "testing_reward_mean": total_reward_mean,
             "testing_reward_std": total_reward_std,
             "testing_reward_min": total_reward_min,
@@ -375,7 +382,9 @@ class neighborhood_il:
                                 ] += np.random.normal(
                                     0,
                                     self.initial_state_noise_std,
-                                    self.env_reset_options["initial_state_dict"][key].shape,
+                                    self.env_reset_options["initial_state_dict"][
+                                        key
+                                    ].shape,
                                 )
                         state = env.reset(options=self.env_reset_options)
                     else:
@@ -421,7 +430,9 @@ class neighborhood_il:
                                 ] += np.random.normal(
                                     0,
                                     self.initial_state_noise_std,
-                                    self.env_reset_options["initial_state_dict"][key].shape,
+                                    self.env_reset_options["initial_state_dict"][
+                                        key
+                                    ].shape,
                                 )
                         state = env.reset(options=self.env_reset_options)
                     else:
@@ -429,6 +440,22 @@ class neighborhood_il:
             done = False
             total_reward = 0
             while not done:
+                if hasattr(env, "eval_toy_q") and self.total_steps % 5 == 0:
+                    _, _, _, testing_step_penalty = env.eval_toy_q(
+                        agent,
+                        f"./experiment_logs/{self.env_id}{self.log_name}/",
+                        self.total_steps,
+                        storage,
+                        self.NeighborhoodNet,
+                        self.oracle_neighbor,
+                    )
+                    wandb.log(
+                        {
+                            "eval_step_penalty": testing_step_penalty,
+                            "eval_total_steps": self.total_steps,
+                        }
+                    )
+
                 action = agent.act(state)
                 next_state, reward, done, info = env.step(action)
                 total_reward += reward
@@ -467,7 +494,7 @@ class neighborhood_il:
                     self.complementary_reward,
                 )
                 self.total_steps += 1
-            agent.entropy_loss_weight *= self.entropy_loss_weight_decay_rate
+                
             wandb.log(
                 {
                     "training_reward": total_reward,
@@ -477,7 +504,6 @@ class neighborhood_il:
                     **loss_info,
                     **neighbor_info,
                     **IDM_info,
-                    "entropy_loss_weight": agent.entropy_loss_weight,
                     "total_steps": self.total_steps,
                 }
             )
@@ -510,15 +536,7 @@ class neighborhood_il:
                         "best_testing_neighborhood_reward": self.best_testing_neighborhood_reward,
                     }
                 )
-                if hasattr(env, "eval_toy_q"):
-                    env.eval_toy_q(
-                        agent,
-                        self.NeighborhoodNet,
-                        storage,
-                        f"./experiment_logs/{self.env_id}{self.log_name}/",
-                        episode,
-                        self.oracle_neighbor,
-                    )
+
             if self.auto_threshold_ratio:
                 self.policy_threshold_ratio *= self.threshold_discount_factor
 

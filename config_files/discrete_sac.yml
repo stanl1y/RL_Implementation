@@ -10,7 +10,6 @@ gamma:
   0.99
 optim:
   adam
-
 buffer_type:
   normal
 td_length:
@@ -43,3 +42,11 @@ save_weight_period:
   50
 render:
   False
+save_state_idx:
+  False
+buffer_to_tensor:
+  False
+delete_prev_weight:
+  True
+toy_reward_type:
+  "gail"

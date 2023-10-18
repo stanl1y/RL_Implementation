@@ -260,6 +260,16 @@ def get_config():
         action="store_true",
         help="delete absolute state dimension from env observation",
     )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        help="discount factor of td learning",
+    )
+    parser.add_argument(
+        "--toy_reward_type",
+        type=str,
+        help="reward type of toy env",
+    )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 
@@ -273,7 +283,8 @@ if __name__ == "__main__":
         config.wrapper_type,
         config.terminate_when_unhealthy,
         config.max_episode_steps,
-        config.only_use_relative_state
+        config.only_use_relative_state,
+        config.toy_reward_type,
     )
     agent = get_rl_agent(env, config)
     storage = get_replay_buffer(env, config)

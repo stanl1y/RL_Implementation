@@ -49,7 +49,6 @@ class discrete_sac(base_ac):
         self.clip_grad_param = 1
         # Target entropy is -log(1/|A|) * ratio (= maximum entropy * ratio).
         self.target_entropy = -np.log(1.0 / action_num) * 0.98
-        print(self.target_entropy)
         self.log_alpha = nn.Parameter(torch.ones(1).to(device) * log_alpha_init)
         self.log_alpha_optimizer = torch.optim.Adam(params=[self.log_alpha], lr=lr)
         self.best_log_alpha_optimizer = copy.deepcopy(self.log_alpha_optimizer)
@@ -138,7 +137,8 @@ class discrete_sac(base_ac):
             target_value = reward + (self.gamma * (1 - done) * q_target_next)
 
         """compute loss and update"""
-        q_val = [critic(state).gather(1, action.long()) for critic in self.critic]
+
+        q_val = [critic(state).gather(1, action.type(torch.int64)) for critic in self.critic]
         critic_loss = [self.critic_criterion(pred, target_value) for pred in q_val]
 
         # Update critics
@@ -189,6 +189,54 @@ class discrete_sac(base_ac):
         self.actor_optimizer.step()
         return bc_loss
 
+    def neighborhood_reward_cuda(
+        self,
+        NeighborhoodNet,
+        expert_ns_data,
+        next_state,
+        oracle_neighbor,
+        discretize_reward=False,
+    ):
+        """construct a tensor that looks like
+        |s'^a_1, s^e_1|
+        |s'^a_1, s^e_2|
+        |s'^a_1, s^e_3|
+        | ......
+        |s'^a_m, s^e_{n-1}|
+        |s'^a_m, s^e_n|
+
+        it is in the shape (len(state)*len(expert_state), 2*observation_dim)
+        """
+        # print("in neighborhood reward")
+        # t = time.time()
+        # print("next_state to device time", time.time() - t)
+        # t = time.time()
+        cartesian_product_state = torch.cat(
+            (
+                torch.repeat_interleave(
+                    next_state, len(expert_ns_data) // self.batch_size, dim=0
+                ),
+                expert_ns_data,
+            ),
+            dim=1,
+        )
+        # print("concatenate time", time.time() - t)
+        # t = time.time()
+
+        with torch.no_grad():
+            prob = NeighborhoodNet(cartesian_product_state)
+            # prob is in the shape of (len(next_state)*len(expert_state), 1)
+            # print("prob time", time.time() - t)
+            # t = time.time()
+        if discretize_reward:
+            prob[prob > 0.5] = 0.5
+            prob[prob <= 0.5] = 0
+        reward = prob.reshape((len(next_state), -1))
+        reward = reward.sum(axis=1, keepdims=True)
+        # print("reshape time", time.time() - t)
+        # print("end neighborhood reward")
+        return reward
+    
     def neighborhood_reward(
         self,
         NeighborhoodNet,
@@ -201,7 +249,10 @@ class discrete_sac(base_ac):
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             -1, expert=True
         )
-
+        
+        expert_next_state = np.concatenate(
+                (expert_next_state, np.array([[-0.3, -0.4]])), axis=0
+        )
         """construct a tensor that looks like
         |s'^a_1, s^e_1|
         |s'^a_1, s^e_2|
@@ -237,42 +288,70 @@ class discrete_sac(base_ac):
         self,
         storage,
         NeighborhoodNet,
+        expert_ns_data,
+        expert_reward_ones,
         margin_value,
         bc_only=False,
+        no_bc=False,
         oracle_neighbor=False,
         discretize_reward=False,
         policy_threshold_ratio=0.5,
+        use_env_done=False,
+        *argv,
     ):
         """sample agent data"""
         state, action, _, next_state, done = storage.sample(self.batch_size)
 
-        reward = self.neighborhood_reward(
-            NeighborhoodNet, storage, next_state, oracle_neighbor, discretize_reward
-        )
+        if not storage.to_tensor:
+            state = torch.FloatTensor(state)
+            action = torch.FloatTensor(action)
+            next_state = torch.FloatTensor(next_state)
+            done = torch.FloatTensor(done)
+        state = state.to(device)
+        action = action.to(device)
+        next_state = next_state.to(device)
+        done = done.to(device)
 
-        state = torch.FloatTensor(state).to(device)
-        action = torch.tensor(action, dtype=torch.int64).to(device)
-        next_state = torch.FloatTensor(next_state).to(device)
-        done = torch.FloatTensor(np.zeros_like(done)).to(
-            device
-        )  # try to use no done in imitation learning
+        reward = self.neighborhood_reward_cuda(
+            NeighborhoodNet,
+            expert_ns_data,
+            next_state,
+            oracle_neighbor,
+            discretize_reward,
+        )
+        # reward = self.neighborhood_reward(
+        #     NeighborhoodNet, storage, next_state, oracle_neighbor, discretize_reward
+        # )
+
 
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             self.batch_size, expert=True
         )
 
-        expert_reward = self.neighborhood_reward(
+        if not storage.to_tensor:
+            expert_state = torch.FloatTensor(expert_state)
+            expert_action = torch.LongTensor(expert_action)
+            expert_next_state = torch.FloatTensor(expert_next_state)
+            expert_done = torch.FloatTensor(expert_done)
+        expert_state = expert_state.to(device)
+        expert_action = expert_action.to(device)
+        expert_next_state = expert_next_state.to(device)
+        expert_done = expert_done.to(device)
+
+        expert_reward = self.neighborhood_reward_cuda(
             NeighborhoodNet,
-            storage,
+            expert_ns_data,
             expert_next_state,
             oracle_neighbor,
             discretize_reward,
         )
-        expert_state = torch.FloatTensor(expert_state).to(device)
-        expert_action = torch.tensor(expert_action, dtype=torch.int64).to(device)
-        expert_next_state = torch.FloatTensor(expert_next_state).to(device)
-        expert_done = torch.FloatTensor(np.zeros_like(expert_done)).to(device)
+
+        if not use_env_done:
+            done *= 0
+            expert_done *= 0
+
         expert_reward_mean = expert_reward.mean().item()
+
         ac_loss = self.update_ac(
             state,
             action,
@@ -340,7 +419,7 @@ class discrete_sac(base_ac):
             self.log_alpha_optimizer.state_dict()
         )
 
-    def save_weight(self, best_testing_reward, algo, env_id, episodes):
+    def save_weight(self, best_testing_reward, algo, env_id, episodes, **kwargs):
         dir_path = f"./trained_model/{algo}/{env_id}/"
         if not os.path.isdir(dir_path):
             os.makedirs(dir_path)

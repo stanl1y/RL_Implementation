@@ -148,3 +148,5 @@ complementary_reward:
   False
 only_use_relative_state:
   False
+toy_reward_type:
+  "gail"

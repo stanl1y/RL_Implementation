@@ -16,9 +16,11 @@ class vanilla_off_policy_training_stage:
         self.render = config.render
         self.delete_prev_weight = config.delete_prev_weight
         self.infinite_bootstrap = config.infinite_bootstrap
+        self.log_name = config.log_name
+        self.total_steps = 0
         wandb.init(
             project="RL_Implementation",
-            name=f"{self.algo}_{self.env_id}",
+            name=f"{self.algo}_{self.env_id}{self.log_name}",
             config=config,
         )
 
@@ -82,6 +84,19 @@ class vanilla_off_policy_training_stage:
             done = False
             total_reward = 0
             while not done:
+                if hasattr(env, "eval_toy_q") and self.total_steps % 5 == 0:
+                    _, _, _, testing_step_penalty = env.eval_toy_q(
+                        agent,
+                        f"./experiment_logs/{self.env_id}{self.log_name}/",
+                        self.total_steps,
+                        storage,
+                    )
+                    wandb.log(
+                        {
+                            "eval_step_penalty": testing_step_penalty,
+                            "eval_total_steps": self.total_steps,
+                        }
+                    )
                 if self.goal_condition:
                     state_c = np.append(
                         state["observation"],
@@ -94,13 +109,14 @@ class vanilla_off_policy_training_stage:
                 total_reward += reward
                 storage.store(state, action, reward, next_state, (done if not self.infinite_bootstrap else False))
                 loss_info = agent.update(storage)
-                wandb.log(loss_info, commit=False)
+                self.total_steps += 1
                 state = next_state
             wandb.log(
                 {
                     "training_reward": total_reward,
                     "episode_num": i,
                     "buffer_size": len(storage),
+                    **loss_info,
                 }
             )
             if i % 5 == 0:
