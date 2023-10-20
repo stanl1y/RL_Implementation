@@ -3,7 +3,7 @@ env:
 algo:
   sac
 util:
-  ["NeighborhoodNet", "OracleNeighborhoodNet", "InverseDynamicModule"]
+  ["NeighborhoodNet", "OracleNeighborhoodNet", "InverseDynamicModule", "Discriminator"]
 oracle_neighbor:
   False
 wrapper_type:
@@ -150,3 +150,7 @@ only_use_relative_state:
   False
 toy_reward_type:
   "gail"
+use_discriminator:
+  False
+beta:
+  0.1

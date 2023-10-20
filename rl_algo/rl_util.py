@@ -22,4 +22,8 @@ def get_util(env, config):
                 action_scale=(max(env.action_space.high) - min(env.action_space.low))
                 / 2,
             )
+        if util == "Discriminator":
+            util_dict[util] = Discriminator(
+                state_dim=env.get_observation_dim(), action_dim=env.get_action_dim(), hidden_dim=config.hidden_dim
+            )
     return util_dict

@@ -1,4 +1,5 @@
 from .NeighborhoodNet import NeighborhoodNet
 from .OracleNeighborhoodNet import OracleNeighborhoodNet
 from .InverseDynamicModule import InverseDynamicModule
-__all__ = ["NeighborhoodNet", "OracleNeighborhoodNet", "InverseDynamicModule"]
+from .Discriminator import Discriminator
+__all__ = ["NeighborhoodNet", "OracleNeighborhoodNet", "InverseDynamicModule", "Discriminator"]

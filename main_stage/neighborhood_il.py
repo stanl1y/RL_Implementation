@@ -72,6 +72,8 @@ class neighborhood_il:
         self.initial_state_noise_std = config.initial_state_noise_std
         self.complementary_reward = config.complementary_reward
         self.only_use_relative_state = config.only_use_relative_state
+        self.use_discriminator = config.use_discriminator
+        self.beta=config.beta
         if self.env_id in [
             "AdroitHandDoor-v1",
             "AdroitHandHammer-v1",
@@ -209,6 +211,12 @@ class neighborhood_il:
             self.NeighborhoodNet_optimizer = torch.optim.Adam(
                 self.NeighborhoodNet.parameters(), lr=3e-4
             )
+        if self.use_discriminator:
+            self.Discriminator = util_dict["Discriminator"].to(device)
+            self.Discriminator_optimizer = torch.optim.Adam(
+                self.Discriminator.parameters(), lr=3e-4
+            )
+            self.Discriminator_criteria = nn.BCELoss(reduction="none")
         if self.use_IDM:
             self.InverseDynamicModule = util_dict["InverseDynamicModule"].to(device)
             self.IDM_optimizer = torch.optim.Adam(
@@ -468,6 +476,10 @@ class neighborhood_il:
                     IDM_info = self.update_IDM(storage)
                 else:
                     IDM_info = {}
+                if self.use_discriminator:
+                    discriminator_info=self.update_discriminator(storage)
+                else:
+                    discriminator_info={}
                 loss_info = agent.update_using_neighborhood_reward(
                     storage,
                     self.NeighborhoodNet
@@ -492,6 +504,8 @@ class neighborhood_il:
                     self.k_of_topk,
                     self.InverseDynamicModule if self.use_IDM else None,
                     self.complementary_reward,
+                    self.Discriminator if self.use_discriminator else None,
+                    self.beta
                 )
                 self.total_steps += 1
                 
@@ -504,6 +518,7 @@ class neighborhood_il:
                     **loss_info,
                     **neighbor_info,
                     **IDM_info,
+                    **discriminator_info,
                     "total_steps": self.total_steps,
                 }
             )
@@ -675,6 +690,37 @@ class neighborhood_il:
         loss.backward()
         self.IDM_optimizer.step()
         return {"IDM_loss": loss.item()}
+
+    def update_discriminator(self, storage):
+        state, action, _, _, _ = storage.sample(
+            self.batch_size
+        )
+        expert_state, expert_action, _, _, _ = storage.sample(
+            self.batch_size, expert=True
+        )
+        if not storage.to_tensor:
+            state = torch.FloatTensor(state)
+            action = torch.FloatTensor(action)
+            expert_state = torch.FloatTensor(expert_state)
+            expert_action = torch.FloatTensor(expert_action)
+        state = state.to(device)
+        action = action.to(device)
+        expert_state = expert_state.to(device)
+        expert_action = expert_action.to(device)
+        expert_data = torch.cat((expert_state, expert_action), axis=1)
+        agent_data = torch.cat((state, action), axis=1)
+        expert_prediction = self.Discriminator(expert_data)
+        agent_prediction = self.Discriminator(agent_data)
+        expert_loss = self.Discriminator_criteria(expert_prediction, torch.ones_like(expert_prediction))
+        expert_loss = torch.mean(expert_loss)
+        agent_loss = self.Discriminator_criteria(agent_prediction, torch.zeros_like(agent_prediction))
+        agent_loss = torch.mean(agent_loss)
+        loss = expert_loss + agent_loss
+        self.Discriminator_optimizer.zero_grad()
+        loss.backward()
+        self.Discriminator_optimizer.step()
+        return {"discriminator_loss": loss.item()}
+        
 
 
 # CUDA_VISIBLE_DEVICES=0 python3 main.py --main_stage neighborhood_il --main_task neighborhood_dsac --env LunarLander-v2 --wrapper basic --episode 2000 --log_name expectile99_ac_duplicateLast_nextStateReward_disReward

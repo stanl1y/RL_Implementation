@@ -270,6 +270,16 @@ def get_config():
         type=str,
         help="reward type of toy env",
     )
+    parser.add_argument(
+        "--use_discriminator",
+        action="store_true",
+        help="use irl reward in neighborhood il",
+    )
+    parser.add_argument(
+        "--beta",
+        type=float,
+        help="hyper balancing irl reward and neighborhood reward",
+    )
     args = parser.parse_args()
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
 

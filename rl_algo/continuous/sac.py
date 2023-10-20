@@ -502,7 +502,9 @@ class sac(base_agent):
         use_top_k=False,
         k_of_topk=1,
         InverseDynamicModule=None,
-        complementary_reward=False
+        complementary_reward=False,
+        discriminator=None,
+        beta=0.1
     ):
         # print("in update_using_neighborhood_reward")
         # t = time.time()
@@ -533,6 +535,13 @@ class sac(base_agent):
         )
         # print("neighborhood reward time", time.time() - t)
         # t = time.time()
+        if discriminator is not None:
+            with torch.no_grad():
+                data=torch.cat((state, action), axis=1)
+                prob = discriminator(data)
+                prob = prob.reshape(reward.shape)
+            reward = reward * (1 - beta) + prob * beta
+            
 
         expert_state, expert_action, _, expert_next_state, expert_done = storage.sample(
             self.batch_size, expert=True
@@ -559,6 +568,12 @@ class sac(base_agent):
         )
         # print("expert neighborhood reward time", time.time() - t)
         # t = time.time()
+        if discriminator is not None:
+            with torch.no_grad():
+                data=torch.cat((expert_state, expert_action), axis=1)
+                expert_prob = discriminator(data)
+                expert_prob = expert_prob.reshape(reward.shape)
+            expert_reward = expert_reward * (1 - beta) + expert_prob * beta
         if not use_env_done:
             done *= 0
             expert_done *= 0
@@ -571,7 +586,6 @@ class sac(base_agent):
                 state,
                 reward=reward,
                 threshold=expert_reward_mean * policy_threshold_ratio,
-                target_entropy_weight=target_entropy_weight,
             )
             # expert_actor_loss = self.update_actor(
             #     expert_state,
@@ -629,6 +643,8 @@ class sac(base_agent):
         reward_dict = {
             "sampled_expert_reward_mean": expert_reward.mean().item(),
             "sampled_agent_reward_mean": reward.mean().item(),
+            "agent_IRL_reward_mean": prob.mean().item(),
+            "expert_IRL_reward_mean": expert_prob.mean().item(),
         }
         if use_relative_reward:
             reward_dict[
