@@ -643,9 +643,10 @@ class sac(base_agent):
         reward_dict = {
             "sampled_expert_reward_mean": expert_reward.mean().item(),
             "sampled_agent_reward_mean": reward.mean().item(),
-            "agent_IRL_reward_mean": prob.mean().item(),
-            "expert_IRL_reward_mean": expert_prob.mean().item(),
         }
+        if discriminator is not None:
+            reward_dict["agent_IRL_reward_mean"]=prob.mean().item()
+            reward_dict["expert_IRL_reward_mean"]=expert_prob.mean().item()
         if use_relative_reward:
             reward_dict[
                 "sampled_agent_relative_reward_mean"
