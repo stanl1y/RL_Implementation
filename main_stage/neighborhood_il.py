@@ -242,6 +242,7 @@ class neighborhood_il:
         # agent.eval()
         total_reward = []
         total_neighborhood_reward = []
+        total_full_reward = []
         render = self.render and render_id % 40 == 0
         if render:
             frame_buffer = []
@@ -251,7 +252,9 @@ class neighborhood_il:
             success_counter = 0.0
         for i in range(10):
             state_dim = env.get_observation_dim()
+            action_dim = env.get_action_dim()
             traj_ns = np.ones((1000, state_dim))
+            traj_sa = np.ones((1000, state_dim + action_dim))
             mask = np.zeros(1000)
             step_counter = 0
             try:
@@ -286,6 +289,7 @@ class neighborhood_il:
                 episode_reward += reward
                 if render:
                     frame_buffer.append(env.render(mode="rgb_array"))
+                traj_sa[step_counter] = np.concatenate((state, action))
                 state = next_state
                 traj_ns[step_counter] = next_state
                 step_counter += 1
@@ -295,6 +299,7 @@ class neighborhood_il:
             total_reward.append(episode_reward)
 
             mask[:step_counter] = 1
+            traj_sa = torch.FloatTensor(traj_sa).to(device)
             traj_ns = torch.FloatTensor(traj_ns).to(device)
             cartesian_product_state = torch.cat(
                 (
@@ -306,10 +311,15 @@ class neighborhood_il:
             )
             with torch.no_grad():
                 prob = self.NeighborhoodNet(cartesian_product_state)
+                if self.use_discriminator:
+                    gail_prob = self.Discriminator(traj_sa)
+                    gail_reward = gail_prob.cpu().numpy().sum()
             prob = prob.reshape((1000, self.expert_data_num)).sum(dim=1)
             prob = prob.cpu().numpy() * mask
             reward = prob.sum()
             total_neighborhood_reward.append(reward)
+            if self.use_discriminator:
+                total_full_reward.append((1-self.beta)*reward + self.beta*gail_reward)
         with torch.no_grad():
             expert_prob = self.NeighborhoodNet(self.expert_cartesian_product_state)
         expert_reward = expert_prob.cpu().numpy().sum()
@@ -318,6 +328,8 @@ class neighborhood_il:
         total_neighborhood_reward_std = total_neighborhood_reward.std()
         total_neighborhood_reward_min = total_neighborhood_reward.min()
         total_neighborhood_reward_max = total_neighborhood_reward.max()
+        if self.use_discriminator:
+            total_full_reward = np.array(total_full_reward)
         if render:
             imageio.mimsave(
                 f"./experiment_logs/{self.env_id}/{self.log_name}/{render_id}.gif",
@@ -346,6 +358,9 @@ class neighborhood_il:
         }
         if self.record_success_rate:
             return_info["success_rate"] = success_counter
+        if self.use_discriminator:
+            return_info["relative_full_reward"] = total_full_reward.mean() / ((1-self.beta)*expert_reward+(self.beta)*1000)
+            return_info["full_reward_mean"] = total_full_reward.mean()
         return return_info
 
     def train(self, agent, env, storage):
