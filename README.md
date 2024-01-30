@@ -1,9 +1,3 @@
-### Train agent with TDIL reward + IRL reward
-```
-python main.py --main_stage neighborhood_il --main_task neighborhood_sac --env <YOUR ENV> --wrapper basic --episode 20000 --data_name <EXPERT DATA PATH> --no_bc --beta 0.9 --use_discriminator
-```
-
-
 <div id="top"></div>
 <br />
 <div align="center">
