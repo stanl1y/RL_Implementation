@@ -22,18 +22,25 @@ l2=df['l2']
 gail=df['gail']
 tdil=df['tdil']
 #moving average window size 5
-l2 = np.convolve(l2, np.ones((5,))/5, mode='valid')
-gail = np.convolve(gail, np.ones((5,))/5, mode='valid')
-tdil = np.convolve(tdil, np.ones((5,))/5, mode='valid')
-fig = plt.figure()
+window_size = 100
+l2 = np.convolve(l2, np.ones((window_size,))/window_size, mode='valid')
+gail = np.convolve(gail, np.ones((window_size,))/window_size, mode='valid')
+tdil = np.convolve(tdil, np.ones((window_size,))/window_size, mode='valid')
+drop_window=20
+l2=l2[::drop_window]
+gail=gail[::drop_window]
+tdil=tdil[::drop_window]
+fig = plt.figure(figsize=(8, 1.8))  # Adjust the figsize as per your requirement
 ax = plt.subplot(111)
 lw=5
-ax.plot(x[:len(l2)], l2, label='L2',linewidth=lw)
-ax.plot(x[:len(gail)], gail, label='IRL',linewidth=lw)
-ax.plot(x[:len(tdil)], tdil, label='TDIL',linewidth=lw)
-ax.axhline(23, color='r', linestyle='dotted',label='Optimal solution',linewidth=lw)
-plt.xlabel('Total Steps',fontsize=20)
-plt.ylabel('Step per episode',fontsize=20)
+fs=15
+ax.plot(x[:len(l2)]*drop_window, l2, label='L2',linewidth=lw)
+ax.plot(x[:len(gail)]*drop_window, gail, label='IRL',linewidth=lw)
+ax.plot(x[:len(tdil)]*drop_window, tdil, label='TDIL',linewidth=lw)
+ax.axhline(23, color='r', linestyle='dotted',label='Optimal Solution',linewidth=lw)
+ax.axhline(50, color='gray', linestyle='dotted',label='BC',linewidth=lw)
+plt.xlabel('Total Steps',fontsize=fs)
+plt.ylabel('Step Per Episode',fontsize=fs)
 plt.gca().set_ylim(bottom=22)
 # plt.legend(loc="lower left", ncol=4,fontsize='large')
 box = ax.get_position()
@@ -41,10 +48,10 @@ ax.set_position([box.x0, box.y0 + box.height * 0.1,
                  box.width*1.2, box.height * 1.3])
 
 # Put a legend below current axis
-ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1),
-          fancybox=True, shadow=True, ncol=2,fontsize=20)
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25),
+          fancybox=True, shadow=True, ncol=5,fontsize=fs)
 # save plot to file
-plt.savefig('toy_all.png', dpi=900, bbox_inches='tight')
+plt.savefig('toy_all.pdf', dpi=900, bbox_inches='tight')
 print(tdil)
 
 # from PIL import Image, ImageDraw

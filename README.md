@@ -151,6 +151,10 @@ python3 main.py --main_task sac --env HalfCheetah-v3 --episodes 20000 --batch_si
 ```
 python3 main.py --main_stage collect_expert --main_task sac --env Humanoid-v3 --expert_episode_num 1 --weight_path ./trained_model/sac/Humanoid-v3/episode13425_reward6505.137.pt --save_env_states
 ```
+### Train agent with TDIL reward + IRL reward
+```
+python main.py --main_stage neighborhood_il --main_task neighborhood_sac --env <YOUR ENV> --wrapper basic --episode 20000 --data_name <EXPERT DATA PATH> --no_bc --beta 0.9 --use_discriminator
+```
 ### Normal neighborhood IL
 ```
 python3 main.py --main_stage neighborhood_il --main_task neighborhood_sac --env <YOUR ENV> --wrapper basic --episode 20000 --data_name <EXPERT DATA PATH> --log_name <NAME OF THIS RUN>
@@ -168,6 +172,11 @@ add
 ```
 add
 --no_hard_negative_sampling
+```
+### Set terminate when unhealthy in Humanoid and Ant
+```
+add
+--terminate_when_unhealthy
 ```
 
 
