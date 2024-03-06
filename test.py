@@ -30,7 +30,7 @@ drop_window=20
 l2=l2[::drop_window]
 gail=gail[::drop_window]
 tdil=tdil[::drop_window]
-fig = plt.figure(figsize=(8, 1.8))  # Adjust the figsize as per your requirement
+fig = plt.figure(figsize=(8, 1.4))  # Adjust the figsize as per your requirement
 ax = plt.subplot(111)
 lw=5
 fs=15
@@ -39,8 +39,8 @@ ax.plot(x[:len(gail)]*drop_window, gail, label='IRL',linewidth=lw)
 ax.plot(x[:len(tdil)]*drop_window, tdil, label='TDIL',linewidth=lw)
 ax.axhline(23, color='r', linestyle='dotted',label='Optimal Solution',linewidth=lw)
 ax.axhline(50, color='gray', linestyle='dotted',label='BC',linewidth=lw)
-plt.xlabel('Total Steps',fontsize=fs)
-plt.ylabel('Step Per Episode',fontsize=fs)
+plt.xlabel('Total Training Steps',fontsize=fs)
+plt.ylabel('Steps/Episode',fontsize=fs)
 plt.gca().set_ylim(bottom=22)
 # plt.legend(loc="lower left", ncol=4,fontsize='large')
 box = ax.get_position()
@@ -48,7 +48,7 @@ ax.set_position([box.x0, box.y0 + box.height * 0.1,
                  box.width*1.2, box.height * 1.3])
 
 # Put a legend below current axis
-ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25),
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.3),
           fancybox=True, shadow=True, ncol=5,fontsize=fs)
 # save plot to file
 plt.savefig('toy_all.pdf', dpi=900, bbox_inches='tight')
