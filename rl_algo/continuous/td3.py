@@ -139,7 +139,7 @@ class td3(base_agent):
             actor_loss = self.prev_actor_loss
         self.update_step += 1
         return {**critic_loss, **actor_loss}
-        }
+
 
     def cache_weight(self):
         self.best_actor.load_state_dict(self.actor.state_dict())
